@@ -1,0 +1,242 @@
+// Prisma Schema for Stock Market Simulation & Trading Game
+// Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model for authentication and profile
+model User {
+  id              String   @id @default(uuid())
+  username        String   @unique @db.VarChar(50)
+  email           String   @unique @db.VarChar(255)
+  passwordHash    String   @map("password_hash") @db.VarChar(255)
+  startingBalance Decimal  @default(100000) @map("starting_balance") @db.Decimal(15, 2)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  portfolios       Portfolio[]
+  leaderboards     Leaderboard[]
+  userAchievements UserAchievement[]
+  userChallenges   UserChallenge[]
+
+  @@index([email])
+  @@index([username])
+  @@map("users")
+}
+
+// Portfolio model for managing user portfolios
+model Portfolio {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  name        String   @db.VarChar(100)
+  cashBalance Decimal  @map("cash_balance") @db.Decimal(15, 2)
+  totalValue  Decimal? @map("total_value") @db.Decimal(15, 2)
+  createdAt   DateTime @default(now()) @map("created_at")
+  isActive    Boolean  @default(true) @map("is_active")
+
+  // Relations
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  holdings       Holding[]
+  trades         Trade[]
+  leaderboards   Leaderboard[]
+  userChallenges UserChallenge[]
+
+  @@index([userId])
+  @@map("portfolios")
+}
+
+// Holdings model for current asset positions
+model Holding {
+  id          String    @id @default(uuid())
+  portfolioId String    @map("portfolio_id")
+  symbol      String    @db.VarChar(20)
+  assetType   AssetType @map("asset_type")
+  quantity    Decimal   @db.Decimal(18, 8)
+  averageCost Decimal   @map("average_cost") @db.Decimal(15, 4)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  @@unique([portfolioId, symbol])
+  @@index([portfolioId])
+  @@index([symbol])
+  @@map("holdings")
+}
+
+// Trades model for transaction history
+model Trade {
+  id          String    @id @default(uuid())
+  portfolioId String    @map("portfolio_id")
+  symbol      String    @db.VarChar(20)
+  assetType   AssetType @map("asset_type")
+  tradeType   TradeType @map("trade_type")
+  quantity    Decimal   @db.Decimal(18, 8)
+  price       Decimal   @db.Decimal(15, 4)
+  totalValue  Decimal   @map("total_value") @db.Decimal(15, 2)
+  executedAt  DateTime  @default(now()) @map("executed_at")
+
+  // Relations
+  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  @@index([portfolioId])
+  @@index([executedAt])
+  @@index([symbol])
+  @@map("trades")
+}
+
+// Market data cache for storing current prices
+model MarketDataCache {
+  id          String    @id @default(uuid())
+  symbol      String    @unique @db.VarChar(20)
+  assetType   AssetType @map("asset_type")
+  currentPrice Decimal? @map("current_price") @db.Decimal(15, 4)
+  change24h   Decimal?  @map("change_24h") @db.Decimal(10, 4)
+  volume      BigInt?
+  marketCap   BigInt?   @map("market_cap")
+  lastUpdated DateTime  @map("last_updated")
+
+  @@index([symbol])
+  @@index([assetType])
+  @@map("market_data_cache")
+}
+
+// Leaderboard model for ranking users
+model Leaderboard {
+  id               String          @id @default(uuid())
+  userId           String          @map("user_id")
+  portfolioId      String          @map("portfolio_id")
+  period           LeaderboardPeriod
+  returnPercentage Decimal         @map("return_percentage") @db.Decimal(10, 4)
+  rank             Int
+  snapshotDate     DateTime        @map("snapshot_date") @db.Date
+  createdAt        DateTime        @default(now()) @map("created_at")
+
+  // Relations
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  @@index([period, rank])
+  @@index([snapshotDate])
+  @@index([userId])
+  @@map("leaderboards")
+}
+
+// Achievements model for gamification
+model Achievement {
+  id           String   @id @default(uuid())
+  name         String   @unique @db.VarChar(100)
+  description  String   @db.Text
+  badgeIcon    String?  @map("badge_icon") @db.VarChar(255)
+  criteriaType String   @map("criteria_type") @db.VarChar(50)
+  criteriaValue Json    @map("criteria_value")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  userAchievements UserAchievement[]
+
+  @@map("achievements")
+}
+
+// User achievements (earned badges)
+model UserAchievement {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  achievementId String   @map("achievement_id")
+  earnedAt      DateTime @default(now()) @map("earned_at")
+
+  // Relations
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+  @@map("user_achievements")
+}
+
+// Challenges model for time-bound competitions
+model Challenge {
+  id             String        @id @default(uuid())
+  name           String        @db.VarChar(100)
+  description    String        @db.Text
+  challengeType  ChallengeType @map("challenge_type")
+  targetValue    Decimal?      @map("target_value") @db.Decimal(10, 4)
+  startDate      DateTime      @map("start_date") @db.Date
+  endDate        DateTime      @map("end_date") @db.Date
+  isActive       Boolean       @default(true) @map("is_active")
+
+  // Relations
+  userChallenges UserChallenge[]
+
+  @@map("challenges")
+}
+
+// User challenge participation
+model UserChallenge {
+  id          String          @id @default(uuid())
+  userId      String          @map("user_id")
+  challengeId String          @map("challenge_id")
+  portfolioId String          @map("portfolio_id")
+  status      ChallengeStatus @default(ACTIVE)
+  progress    Decimal?        @db.Decimal(10, 4)
+  joinedAt    DateTime        @default(now()) @map("joined_at")
+  completedAt DateTime?       @map("completed_at")
+
+  // Relations
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, challengeId])
+  @@index([userId])
+  @@index([challengeId])
+  @@map("user_challenges")
+}
+
+// Enums
+enum AssetType {
+  STOCK
+  CRYPTO
+
+  @@map("asset_type")
+}
+
+enum TradeType {
+  BUY
+  SELL
+
+  @@map("trade_type")
+}
+
+enum LeaderboardPeriod {
+  DAILY
+  WEEKLY
+  MONTHLY
+  ALL_TIME
+
+  @@map("leaderboard_period")
+}
+
+enum ChallengeType {
+  BEAT_MARKET
+  TOP_PERCENTAGE
+  SPECIFIC_RETURN
+
+  @@map("challenge_type")
+}
+
+enum ChallengeStatus {
+  ACTIVE
+  COMPLETED
+  FAILED
+
+  @@map("challenge_status")
+}

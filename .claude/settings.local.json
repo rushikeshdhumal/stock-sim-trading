@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p backend frontend docker)",
+      "Bash(npm init -y)",
+      "Bash(npm create vite@latest . -- --template react-ts)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
