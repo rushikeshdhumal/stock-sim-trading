@@ -5,6 +5,7 @@ import { TradeResult } from '../types';
 import logger from '../config/logger';
 import marketDataService from './marketDataService';
 import portfolioService from './portfolioService';
+import achievementService from './achievementService';
 
 const prisma = getPrismaClient();
 
@@ -88,6 +89,11 @@ export class TradeService {
     // Get updated portfolio
     const updatedPortfolio = await prisma.portfolio.findUnique({
       where: { id: portfolioId },
+    });
+
+    // Check for achievements (async, don't wait)
+    achievementService.checkAndAwardAchievements(userId).catch((error) => {
+      logger.error('Achievement check failed after trade:', error);
     });
 
     return {

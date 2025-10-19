@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuthStore } from '../context/authStore';
 import leaderboardService, { LeaderboardEntry, UserPosition } from '../services/leaderboardService';
+import Navigation from '../components/Navigation';
 import toast from 'react-hot-toast';
 
 type Period = 'daily' | 'weekly' | 'monthly' | 'all_time';
 
 export default function Leaderboard() {
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
   const [period, setPeriod] = useState<Period>('all_time');
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [userPosition, setUserPosition] = useState<UserPosition | null>(null);
@@ -53,23 +53,7 @@ export default function Leaderboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-primary-600">Stock Sim Trading</h1>
-          <div className="flex items-center gap-4">
-            <Link to="/dashboard" className="btn btn-secondary text-sm">
-              Dashboard
-            </Link>
-            <Link to="/market" className="btn btn-secondary text-sm hidden sm:inline-block">
-              Market
-            </Link>
-            <button onClick={logout} className="btn btn-secondary text-sm">
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
+      <Navigation />
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">

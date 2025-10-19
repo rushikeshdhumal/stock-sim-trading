@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuthStore } from '../context/authStore';
 import portfolioService from '../services/portfolioService';
 import { PortfolioWithHoldings } from '../types';
 import TradingModal from '../components/TradingModal';
+import Navigation from '../components/Navigation';
 import toast from 'react-hot-toast';
 
 export default function Dashboard() {
-  const { user, logout } = useAuthStore();
   const [portfolio, setPortfolio] = useState<PortfolioWithHoldings | null>(null);
   const [loading, setLoading] = useState(true);
   const [showTradingModal, setShowTradingModal] = useState(false);
@@ -30,10 +28,6 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleLogout = async () => {
-    await logout();
   };
 
   const openTradeModal = (symbol: string = '', type: 'BUY' | 'SELL' = 'BUY') => {
@@ -78,30 +72,21 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-primary-600">Stock Sim Trading</h1>
-          <div className="flex items-center gap-4">
-            <Link to="/market" className="btn btn-secondary text-sm hidden sm:inline-block">
-              Market
-            </Link>
-            <button
-              onClick={() => openTradeModal()}
-              className="btn btn-primary text-sm"
-            >
-              Trade
-            </button>
-            <span className="text-sm hidden sm:inline">Welcome, {user?.username}!</span>
-            <button onClick={handleLogout} className="btn btn-secondary text-sm">
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
+      <Navigation />
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
+        {/* Page Header */}
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold">Portfolio Overview</h1>
+          <button
+            onClick={() => openTradeModal()}
+            className="btn btn-primary"
+          >
+            + New Trade
+          </button>
+        </div>
+
         {/* Portfolio Summary */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="card">
