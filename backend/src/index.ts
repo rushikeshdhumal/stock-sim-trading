@@ -7,6 +7,7 @@ import { getRedisClient, disconnectRedis } from './config/redis';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { apiLimiter } from './middleware/rateLimiter';
 import routes from './routes';
+import { initializeScheduledJobs } from './jobs/scheduledJobs';
 
 const app: Application = express();
 const PORT = parseInt(env.PORT);
@@ -56,6 +57,14 @@ const startServer = async () => {
     // Initialize Redis connection
     getRedisClient();
     logger.info('✓ Redis connected');
+
+    // Initialize scheduled jobs
+    if (env.NODE_ENV === 'production') {
+      initializeScheduledJobs();
+      logger.info('✓ Scheduled jobs initialized');
+    } else {
+      logger.info('⚠ Scheduled jobs disabled in development mode');
+    }
 
     // Start listening
     app.listen(PORT, () => {
