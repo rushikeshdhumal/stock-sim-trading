@@ -67,8 +67,9 @@ export class TradeController {
    * POST /api/trades/validate
    */
   validateTrade = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user!.userId;
-    const { portfolioId, symbol, assetType, tradeType, quantity } = req.body;
+    // Future implementation: validate trade parameters
+    // const userId = req.user!.userId;
+    // const { portfolioId, symbol, assetType, tradeType, quantity } = req.body;
 
     // This is a simplified validation - in production you'd check more thoroughly
     successResponse(res, { valid: true, message: 'Trade is valid' });

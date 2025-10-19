@@ -136,7 +136,7 @@ export class LeaderboardService {
         if (!portfolio) return false;
 
         const createdToday = portfolio.createdAt >= today;
-        const hasTradesTo day = portfolio.trades.some(
+        const hasTradesToday = portfolio.trades.some(
           (trade) => trade.executedAt >= today
         );
 
