@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuthStore } from '../context/authStore';
 import marketService from '../services/marketService';
 import portfolioService from '../services/portfolioService';
 import TradingModal from '../components/TradingModal';
+import Navigation from '../components/Navigation';
 import { MarketQuote } from '../types';
 import toast from 'react-hot-toast';
 
 export default function Market() {
-  const { logout } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [trending, setTrending] = useState<MarketQuote[]>([]);
@@ -115,20 +113,7 @@ export default function Market() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-primary-600">Stock Sim Trading</h1>
-          <div className="flex items-center gap-4">
-            <Link to="/dashboard" className="btn btn-secondary text-sm">
-              Dashboard
-            </Link>
-            <button onClick={logout} className="btn btn-secondary text-sm">
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
+      <Navigation />
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">

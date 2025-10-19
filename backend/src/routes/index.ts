@@ -4,6 +4,7 @@ import portfolioRoutes from './portfolioRoutes';
 import tradeRoutes from './tradeRoutes';
 import marketRoutes from './marketRoutes';
 import leaderboardRoutes from './leaderboardRoutes';
+import achievementRoutes from './achievementRoutes';
 
 const router = Router();
 
@@ -13,6 +14,7 @@ router.use('/portfolios', portfolioRoutes);
 router.use('/trades', tradeRoutes);
 router.use('/market', marketRoutes);
 router.use('/leaderboards', leaderboardRoutes);
+router.use('/achievements', achievementRoutes);
 
 // Health check
 router.get('/health', (_req, res) => {

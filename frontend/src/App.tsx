@@ -5,6 +5,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Market from './pages/Market';
 import Leaderboard from './pages/Leaderboard';
+import Achievements from './pages/Achievements';
 import { useAuthStore } from './context/authStore';
 
 // Protected route component
@@ -74,6 +75,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Leaderboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/achievements"
+            element={
+              <ProtectedRoute>
+                <Achievements />
               </ProtectedRoute>
             }
           />
