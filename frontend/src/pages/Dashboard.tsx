@@ -1,13 +1,18 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuthStore } from '../context/authStore';
 import portfolioService from '../services/portfolioService';
 import { PortfolioWithHoldings } from '../types';
+import TradingModal from '../components/TradingModal';
 import toast from 'react-hot-toast';
 
 export default function Dashboard() {
   const { user, logout } = useAuthStore();
   const [portfolio, setPortfolio] = useState<PortfolioWithHoldings | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showTradingModal, setShowTradingModal] = useState(false);
+  const [selectedSymbol, setSelectedSymbol] = useState<string>('');
+  const [selectedTradeType, setSelectedTradeType] = useState<'BUY' | 'SELL'>('BUY');
 
   useEffect(() => {
     loadPortfolio();
@@ -31,6 +36,35 @@ export default function Dashboard() {
     await logout();
   };
 
+  const openTradeModal = (symbol: string = '', type: 'BUY' | 'SELL' = 'BUY') => {
+    setSelectedSymbol(symbol);
+    setSelectedTradeType(type);
+    setShowTradingModal(true);
+  };
+
+  const handleTradeComplete = () => {
+    loadPortfolio();
+  };
+
+  const calculateProfitLoss = () => {
+    if (!portfolio?.holdings) return { total: 0, percentage: 0 };
+
+    let totalPL = 0;
+    let totalCost = 0;
+
+    portfolio.holdings.forEach(holding => {
+      if (holding.profitLoss !== undefined) {
+        totalPL += holding.profitLoss;
+        totalCost += holding.averageCost * holding.quantity;
+      }
+    });
+
+    const percentage = totalCost > 0 ? (totalPL / totalCost) * 100 : 0;
+    return { total: totalPL, percentage };
+  };
+
+  const profitLoss = calculateProfitLoss();
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -49,7 +83,16 @@ export default function Dashboard() {
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold text-primary-600">Stock Sim Trading</h1>
           <div className="flex items-center gap-4">
-            <span className="text-sm">Welcome, {user?.username}!</span>
+            <Link to="/market" className="btn btn-secondary text-sm hidden sm:inline-block">
+              Market
+            </Link>
+            <button
+              onClick={() => openTradeModal()}
+              className="btn btn-primary text-sm"
+            >
+              Trade
+            </button>
+            <span className="text-sm hidden sm:inline">Welcome, {user?.username}!</span>
             <button onClick={handleLogout} className="btn btn-secondary text-sm">
               Logout
             </button>
@@ -60,7 +103,7 @@ export default function Dashboard() {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         {/* Portfolio Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="card">
             <h3 className="text-sm text-gray-600 dark:text-gray-400 mb-2">Total Value</h3>
             <p className="text-3xl font-bold text-primary-600">
@@ -76,6 +119,16 @@ export default function Dashboard() {
           </div>
 
           <div className="card">
+            <h3 className="text-sm text-gray-600 dark:text-gray-400 mb-2">Total P/L</h3>
+            <p className={`text-3xl font-bold ${profitLoss.total >= 0 ? 'text-success' : 'text-danger'}`}>
+              {profitLoss.total >= 0 ? '+' : ''}${profitLoss.total.toFixed(2)}
+              <span className="text-lg ml-2">
+                ({profitLoss.percentage >= 0 ? '+' : ''}{profitLoss.percentage.toFixed(2)}%)
+              </span>
+            </p>
+          </div>
+
+          <div className="card">
             <h3 className="text-sm text-gray-600 dark:text-gray-400 mb-2">Holdings</h3>
             <p className="text-3xl font-bold">{portfolio?.holdings.length || 0}</p>
           </div>
@@ -83,7 +136,15 @@ export default function Dashboard() {
 
         {/* Holdings Table */}
         <div className="card">
-          <h2 className="card-header">Your Holdings</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Your Holdings</h2>
+            <button
+              onClick={() => openTradeModal()}
+              className="btn btn-primary text-sm"
+            >
+              + New Trade
+            </button>
+          </div>
 
           {portfolio?.holdings && portfolio.holdings.length > 0 ? (
             <div className="overflow-x-auto">
@@ -95,7 +156,9 @@ export default function Dashboard() {
                     <th className="text-right py-3 px-4">Quantity</th>
                     <th className="text-right py-3 px-4">Avg Cost</th>
                     <th className="text-right py-3 px-4">Current Price</th>
+                    <th className="text-right py-3 px-4">Value</th>
                     <th className="text-right py-3 px-4">P/L</th>
+                    <th className="text-right py-3 px-4">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -109,6 +172,9 @@ export default function Dashboard() {
                       <td className="py-3 px-4 text-right">${holding.averageCost.toFixed(2)}</td>
                       <td className="py-3 px-4 text-right">
                         {holding.currentPrice ? `$${holding.currentPrice.toFixed(2)}` : '-'}
+                      </td>
+                      <td className="py-3 px-4 text-right font-medium">
+                        {holding.currentValue ? `$${holding.currentValue.toFixed(2)}` : '-'}
                       </td>
                       <td className="py-3 px-4 text-right">
                         {holding.profitLoss !== undefined ? (
@@ -124,6 +190,22 @@ export default function Dashboard() {
                           '-'
                         )}
                       </td>
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => openTradeModal(holding.symbol, 'BUY')}
+                            className="text-success hover:underline text-sm font-medium"
+                          >
+                            Buy
+                          </button>
+                          <button
+                            onClick={() => openTradeModal(holding.symbol, 'SELL')}
+                            className="text-danger hover:underline text-sm font-medium"
+                          >
+                            Sell
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -131,11 +213,29 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="text-center py-12 text-gray-500">
-              <p>No holdings yet. Start trading to build your portfolio!</p>
+              <p className="mb-4">No holdings yet. Start trading to build your portfolio!</p>
+              <button
+                onClick={() => openTradeModal()}
+                className="btn btn-primary"
+              >
+                Make Your First Trade
+              </button>
             </div>
           )}
         </div>
       </main>
+
+      {/* Trading Modal */}
+      <TradingModal
+        isOpen={showTradingModal}
+        onClose={() => setShowTradingModal(false)}
+        portfolioId={portfolio?.id || ''}
+        initialSymbol={selectedSymbol}
+        initialType={selectedTradeType}
+        onTradeComplete={handleTradeComplete}
+        cashBalance={portfolio?.cashBalance || 0}
+        holdings={portfolio?.holdings.map(h => ({ symbol: h.symbol, quantity: h.quantity })) || []}
+      />
     </div>
   );
 }
