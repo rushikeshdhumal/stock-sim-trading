@@ -1,4 +1,4 @@
-import { Portfolio, Holding } from '@prisma/client';
+import { Portfolio } from '@prisma/client';
 import getPrismaClient from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 import { PortfolioWithHoldings } from '../types';

@@ -1,9 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mkdir -p backend frontend docker)",
-      "Bash(npm init -y)",
-      "Bash(npm create vite@latest . -- --template react-ts)"
+      "Bash(docker exec -i stocksim-postgres psql -U stocksim -d stocksim)",
+      "Bash(Get-Content migration.sql)",
+      "Bash(cat migration.sql)",
+      "Bash(npx prisma db seed)",
+      "Bash(npx ts-node prisma/seed.ts)",
+      "Bash(npx tsx -r dotenv/config prisma/seed.ts)",
+      "Bash(npx prisma generate)",
+      "Bash(npm run dev)"
     ],
     "deny": [],
     "ask": []

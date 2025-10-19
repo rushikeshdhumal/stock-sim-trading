@@ -10,13 +10,15 @@ export const getPrismaClient = (): PrismaClient => {
       log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
     });
 
-    // Handle connection errors
-    prisma.$connect().catch((error) => {
-      logger.error('Failed to connect to database:', error);
-      process.exit(1);
-    });
-
-    logger.info('Database connection established');
+    // Handle connection errors - attempt connection but don't crash if it fails
+    // Prisma will auto-connect on first query
+    prisma.$connect()
+      .then(() => {
+        logger.info('Database connection established');
+      })
+      .catch((error) => {
+        logger.warn('Database connection failed, will retry on first query:', error.message);
+      });
   }
 
   return prisma;

@@ -45,7 +45,7 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
   }
 };
 
-export const optionalAuth = (req: Request, res: Response, next: NextFunction): void => {
+export const optionalAuth = (req: Request, _res: Response, next: NextFunction): void => {
   try {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -66,11 +66,11 @@ export const optionalAuth = (req: Request, res: Response, next: NextFunction): v
 };
 
 export const generateAccessToken = (payload: Omit<JwtPayload, 'iat' | 'exp'>): string => {
-  return jwt.sign(payload, env.JWT_SECRET, { expiresIn: env.JWT_EXPIRES_IN });
+  return jwt.sign(payload, env.JWT_SECRET, { expiresIn: env.JWT_EXPIRES_IN } as jwt.SignOptions);
 };
 
 export const generateRefreshToken = (payload: Omit<JwtPayload, 'iat' | 'exp'>): string => {
-  return jwt.sign(payload, env.JWT_REFRESH_SECRET, { expiresIn: env.JWT_REFRESH_EXPIRES_IN });
+  return jwt.sign(payload, env.JWT_REFRESH_SECRET, { expiresIn: env.JWT_REFRESH_EXPIRES_IN } as jwt.SignOptions);
 };
 
 export const verifyRefreshToken = (token: string): JwtPayload | null => {
