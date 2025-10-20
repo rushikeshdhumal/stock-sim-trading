@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../context/authStore';
-import leaderboardService, { LeaderboardEntry, UserPosition } from '../services/leaderboardService';
+import leaderboardService from '../services/leaderboardService';
+import type { LeaderboardEntry, UserPosition } from '../services/leaderboardService';
 import Navigation from '../components/Navigation';
 import toast from 'react-hot-toast';
 

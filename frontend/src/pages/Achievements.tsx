@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import achievementService, { AchievementProgress } from '../services/achievementService';
+import achievementService from '../services/achievementService';
+import type { AchievementProgress } from '../services/achievementService';
 import Navigation from '../components/Navigation';
 import toast from 'react-hot-toast';
 

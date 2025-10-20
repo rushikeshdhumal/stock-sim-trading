@@ -1,5 +1,5 @@
 import apiClient from './api';
-import { Portfolio, PortfolioWithHoldings } from '../types';
+import type { Portfolio, PortfolioWithHoldings } from '../types/index.js';
 
 export const portfolioService = {
   async getPortfolios(): Promise<Portfolio[]> {

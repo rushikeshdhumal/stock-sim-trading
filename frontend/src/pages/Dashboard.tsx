@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import portfolioService from '../services/portfolioService';
-import { PortfolioWithHoldings } from '../types';
+import type { PortfolioWithHoldings } from '../types/index.js';
 import TradingModal from '../components/TradingModal';
 import Navigation from '../components/Navigation';
 import toast from 'react-hot-toast';

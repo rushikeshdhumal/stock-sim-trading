@@ -1,6 +1,6 @@
 import apiClient from './api';
 
-export interface Achievement {
+export type Achievement = {
   id: string;
   name: string;
   description: string;
@@ -8,23 +8,23 @@ export interface Achievement {
   criteriaType: string;
   criteriaValue: any;
   createdAt: string;
-}
+};
 
-export interface UserAchievement {
+export type UserAchievement = {
   id: string;
   achievementId: string;
   name: string;
   description: string;
   badgeIcon?: string;
   earnedAt: string;
-}
+};
 
-export interface AchievementProgress {
+export type AchievementProgress = {
   total: number;
   earned: number;
   progress: number;
   achievements: Array<Achievement & { earned: boolean; earnedAt?: string }>;
-}
+};
 
 export const achievementService = {
   async getAllAchievements(): Promise<Achievement[]> {
