@@ -1,6 +1,6 @@
 import apiClient from './api';
 
-export interface LeaderboardEntry {
+export type LeaderboardEntry = {
   id: string;
   rank: number;
   username: string;
@@ -9,21 +9,21 @@ export interface LeaderboardEntry {
   totalValue: number;
   period: string;
   snapshotDate: string;
-}
+};
 
-export interface UserRank {
+export type UserRank = {
   period: string;
   rank: number;
   returnPercentage: number;
-}
+};
 
-export interface UserPosition {
+export type UserPosition = {
   rank: number;
   returnPercentage: number;
   totalParticipants: number;
   percentile: number;
   ranked: boolean;
-}
+};
 
 export const leaderboardService = {
   async getLeaderboard(

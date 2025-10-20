@@ -1,5 +1,5 @@
 import apiClient from './api';
-import { TradeRequest, TradeResult, Trade } from '../types';
+import type { TradeRequest, TradeResult, Trade } from '../types/index.js';
 
 export const tradeService = {
   async executeBuy(trade: TradeRequest): Promise<TradeResult> {

@@ -1,5 +1,5 @@
 import apiClient from './api';
-import { MarketQuote } from '../types';
+import type { MarketQuote } from '../types/index.js';
 
 export const marketService = {
   async search(query: string, type?: 'stock' | 'crypto' | 'all'): Promise<any[]> {

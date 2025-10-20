@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MarketQuote } from '../types';
+import type { MarketQuote } from '../types/index.js';
 import marketService from '../services/marketService';
 import tradeService from '../services/tradeService';
 import toast from 'react-hot-toast';

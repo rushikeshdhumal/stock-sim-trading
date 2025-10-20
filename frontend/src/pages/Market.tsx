@@ -3,7 +3,7 @@ import marketService from '../services/marketService';
 import portfolioService from '../services/portfolioService';
 import TradingModal from '../components/TradingModal';
 import Navigation from '../components/Navigation';
-import { MarketQuote } from '../types';
+import type { MarketQuote } from '../types/index.js';
 import toast from 'react-hot-toast';
 
 export default function Market() {
