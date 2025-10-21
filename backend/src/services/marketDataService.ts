@@ -51,6 +51,7 @@ export class MarketDataService {
    * Search for stocks/crypto
    */
   async search(query: string, type: 'stock' | 'crypto' | 'all' = 'all'): Promise<any[]> {
+    // First, search in cache
     const results = await prisma.marketDataCache.findMany({
       where: {
         symbol: {
@@ -63,12 +64,34 @@ export class MarketDataService {
       take: 10,
     });
 
-    return results.map((item) => ({
-      symbol: item.symbol,
-      assetType: item.assetType,
-      currentPrice: item.currentPrice?.toNumber(),
-      change24h: item.change24h?.toNumber(),
-    }));
+    // If found in cache, return results
+    if (results.length > 0) {
+      return results.map((item) => ({
+        symbol: item.symbol,
+        assetType: item.assetType,
+        currentPrice: item.currentPrice?.toNumber(),
+        change24h: item.change24h?.toNumber(),
+      }));
+    }
+
+    // If not found in cache and query looks like a symbol (3-5 uppercase chars), fetch from API
+    const symbolPattern = /^[A-Z]{1,5}$/i;
+    if (symbolPattern.test(query)) {
+      try {
+        const quote = await this.getQuote(query.toUpperCase());
+        return [{
+          symbol: quote.symbol,
+          assetType: quote.assetType,
+          currentPrice: quote.currentPrice,
+          change24h: quote.change24h,
+        }];
+      } catch (error) {
+        logger.warn(`Failed to fetch quote for ${query}:`, error);
+        return [];
+      }
+    }
+
+    return [];
   }
 
   /**
@@ -110,54 +133,90 @@ export class MarketDataService {
   }
 
   /**
-   * Fetch quote from external API (Alpha Vantage)
+   * Fetch quote from external API with fallback chain
+   * Priority: Alpha Vantage -> yfinance -> Mock Data
    */
   private async fetchQuoteFromAPI(symbol: string): Promise<MarketQuote> {
-    try {
-      // If no API key, return mock data for development
-      if (!env.ALPHA_VANTAGE_API_KEY) {
-        logger.warn(`No API key configured, returning mock data for ${symbol}`);
-        return this.getMockQuote(symbol);
+    // Try Alpha Vantage first
+    if (env.ALPHA_VANTAGE_API_KEY) {
+      try {
+        return await this.fetchFromAlphaVantage(symbol);
+      } catch (error: any) {
+        // If rate limited (429) or other error, try yfinance
+        logger.warn(`Alpha Vantage failed for ${symbol}, trying yfinance:`, error.message);
       }
-
-      const url = `https://www.alphavantage.co/query`;
-      const response = await axios.get(url, {
-        params: {
-          function: 'GLOBAL_QUOTE',
-          symbol,
-          apikey: env.ALPHA_VANTAGE_API_KEY,
-        },
-        timeout: 5000,
-      });
-
-      const quote = response.data['Global Quote'];
-
-      if (!quote || !quote['05. price']) {
-        throw new AppError('Symbol not found', 404);
-      }
-
-      const currentPrice = parseFloat(quote['05. price']);
-      const change = parseFloat(quote['09. change']);
-      const changePercent = parseFloat(quote['10. change percent'].replace('%', ''));
-
-      return {
-        symbol: symbol.toUpperCase(),
-        assetType: 'STOCK',
-        currentPrice,
-        change24h: change,
-        changePercentage: changePercent,
-        volume: parseInt(quote['06. volume']) || undefined,
-        lastUpdated: new Date(),
-      };
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error(`Failed to fetch quote for ${symbol}:`, error);
-
-      // Return mock data as fallback
-      return this.getMockQuote(symbol);
     }
+
+    // Try yfinance service
+    try {
+      return await this.fetchFromYFinance(symbol);
+    } catch (error) {
+      logger.warn(`yfinance failed for ${symbol}, using mock data:`, error);
+    }
+
+    // Fallback to mock data
+    logger.warn(`All APIs failed for ${symbol}, returning mock data`);
+    return this.getMockQuote(symbol);
+  }
+
+  /**
+   * Fetch from Alpha Vantage API
+   */
+  private async fetchFromAlphaVantage(symbol: string): Promise<MarketQuote> {
+    const url = `https://www.alphavantage.co/query`;
+    const response = await axios.get(url, {
+      params: {
+        function: 'GLOBAL_QUOTE',
+        symbol,
+        apikey: env.ALPHA_VANTAGE_API_KEY,
+      },
+      timeout: 5000,
+    });
+
+    const quote = response.data['Global Quote'];
+
+    if (!quote || !quote['05. price']) {
+      throw new AppError('Symbol not found in Alpha Vantage', 404);
+    }
+
+    const currentPrice = parseFloat(quote['05. price']);
+    const change = parseFloat(quote['09. change']);
+    const changePercent = parseFloat(quote['10. change percent'].replace('%', ''));
+
+    return {
+      symbol: symbol.toUpperCase(),
+      assetType: 'STOCK',
+      currentPrice,
+      change24h: change,
+      changePercentage: changePercent,
+      volume: parseInt(quote['06. volume']) || undefined,
+      lastUpdated: new Date(),
+    };
+  }
+
+  /**
+   * Fetch from yfinance Python microservice
+   */
+  private async fetchFromYFinance(symbol: string): Promise<MarketQuote> {
+    const url = `http://localhost:5001/quote/${symbol}`;
+    const response = await axios.get(url, { timeout: 5000 });
+
+    if (response.status !== 200 || !response.data) {
+      throw new Error('Symbol not found in yfinance');
+    }
+
+    const data = response.data;
+
+    return {
+      symbol: data.symbol,
+      assetType: data.assetType || 'STOCK',
+      currentPrice: data.currentPrice,
+      change24h: data.change24h,
+      changePercentage: data.changePercentage,
+      volume: data.volume || undefined,
+      marketCap: data.marketCap || undefined,
+      lastUpdated: new Date(),
+    };
   }
 
   /**
