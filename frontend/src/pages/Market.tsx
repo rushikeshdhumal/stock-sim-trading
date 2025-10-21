@@ -43,7 +43,7 @@ export default function Market() {
       const portfolios = await portfolioService.getPortfolios();
       if (portfolios.length > 0) {
         setPortfolioId(portfolios[0].id);
-        setCashBalance(portfolios[0].cashBalance);
+        setCashBalance(Number(portfolios[0].cashBalance || 0));
       }
     } catch (error) {
       console.error('Failed to load portfolio:', error);
