@@ -34,10 +34,11 @@ export default function TradingModal({
   const [searchResults, setSearchResults] = useState<any[]>([]);
 
   useEffect(() => {
-    if (initialSymbol) {
+    if (isOpen && initialSymbol) {
+      setSymbol(initialSymbol);
       loadQuote(initialSymbol);
     }
-  }, [initialSymbol]);
+  }, [initialSymbol, isOpen]);
 
   const loadQuote = async (sym: string) => {
     if (!sym) return;
@@ -93,8 +94,9 @@ export default function TradingModal({
     const totalValue = quote.currentPrice * qty;
 
     if (tradeType === 'BUY') {
-      if (totalValue > cashBalance) {
-        toast.error(`Insufficient funds. You need $${totalValue.toFixed(2)} but only have $${cashBalance.toFixed(2)}`);
+      const cash = Number(cashBalance || 0);
+      if (totalValue > cash) {
+        toast.error(`Insufficient funds. You need $${totalValue.toFixed(2)} but only have $${cash.toFixed(2)}`);
         return;
       }
     } else {
@@ -111,6 +113,7 @@ export default function TradingModal({
         portfolioId,
         symbol: symbol.toUpperCase(),
         assetType: quote.assetType as 'STOCK' | 'CRYPTO',
+        tradeType: tradeType,
         quantity: qty,
       };
 
@@ -193,21 +196,40 @@ export default function TradingModal({
           {/* Symbol Search */}
           <div>
             <label className="block text-sm font-medium mb-2">Symbol</label>
-            <div className="relative">
-              <input
-                type="text"
-                value={symbol}
-                onChange={(e) => handleSearch(e.target.value)}
-                className="input uppercase"
-                placeholder="Enter symbol (e.g., AAPL, BTC)"
-                disabled={loading}
-              />
-              {searching && (
-                <div className="absolute right-3 top-3">
-                  <div className="w-5 h-5 border-2 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
+            {quote ? (
+              <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                <div>
+                  <div className="text-2xl font-bold">{symbol}</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">{quote.assetType}</div>
                 </div>
-              )}
-            </div>
+                <button
+                  onClick={() => {
+                    setQuote(null);
+                    setSymbol('');
+                    setQuantity('');
+                  }}
+                  className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                >
+                  Change
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <input
+                  type="text"
+                  value={symbol}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="input uppercase"
+                  placeholder="Enter symbol (e.g., AAPL, BTC)"
+                  disabled={loading}
+                />
+                {searching && (
+                  <div className="absolute right-3 top-3">
+                    <div className="w-5 h-5 border-2 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Search Results */}
             {searchResults.length > 0 && (
@@ -294,8 +316,8 @@ export default function TradingModal({
               {tradeType === 'BUY' && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600 dark:text-gray-400">Cash after trade</span>
-                  <span className={cashBalance - totalValue >= 0 ? 'text-success' : 'text-danger'}>
-                    ${(cashBalance - totalValue).toFixed(2)}
+                  <span className={Number(cashBalance || 0) - totalValue >= 0 ? 'text-success' : 'text-danger'}>
+                    ${(Number(cashBalance || 0) - totalValue).toFixed(2)}
                   </span>
                 </div>
               )}
@@ -305,7 +327,7 @@ export default function TradingModal({
           {/* Cash Balance */}
           <div className="flex justify-between items-center text-sm">
             <span className="text-gray-600 dark:text-gray-400">Available Cash</span>
-            <span className="font-semibold">${cashBalance.toFixed(2)}</span>
+            <span className="font-semibold">${Number(cashBalance || 0).toFixed(2)}</span>
           </div>
         </div>
 

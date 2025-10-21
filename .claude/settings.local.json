@@ -28,7 +28,20 @@
       "Bash(cat index.ts)",
       "Bash(netstat -ano)",
       "Bash(findstr \":3001\")",
-      "Bash(taskkill //F //PID 19916)"
+      "Bash(taskkill //F //PID 19916)",
+      "Bash(tree:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(xargs:*)",
+      "Bash(rm:*)",
+      "Bash(rmdir:*)",
+      "Bash(findstr:*)",
+      "Bash(docker:*)",
+      "Bash(where:*)",
+      "Bash(timeout /t 5 /nobreak)",
+      "Bash(curl:*)",
+      "Bash(pip install:*)",
+      "Bash(python yfinance-service.py:*)"
     ],
     "deny": [],
     "ask": []

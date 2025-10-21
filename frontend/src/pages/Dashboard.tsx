@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import portfolioService from '../services/portfolioService';
-import type { PortfolioWithHoldings } from '../types/index.js';
+import tradeService from '../services/tradeService';
+import type { PortfolioWithHoldings, Trade } from '../types/index.js';
 import TradingModal from '../components/TradingModal';
 import Navigation from '../components/Navigation';
 import toast from 'react-hot-toast';
@@ -11,6 +12,8 @@ export default function Dashboard() {
   const [showTradingModal, setShowTradingModal] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState<string>('');
   const [selectedTradeType, setSelectedTradeType] = useState<'BUY' | 'SELL'>('BUY');
+  const [recentTrades, setRecentTrades] = useState<Trade[]>([]);
+  const [showTransactions, setShowTransactions] = useState(false);
 
   useEffect(() => {
     loadPortfolio();
@@ -38,6 +41,29 @@ export default function Dashboard() {
 
   const handleTradeComplete = () => {
     loadPortfolio();
+    if (showTransactions && portfolio?.id) {
+      loadRecentTrades();
+    }
+  };
+
+  const loadRecentTrades = async () => {
+    if (!portfolio?.id) return;
+    try {
+      const { trades } = await tradeService.getTradeHistory({
+        portfolioId: portfolio.id,
+        limit: 10,
+      });
+      setRecentTrades(trades);
+    } catch (error) {
+      toast.error('Failed to load trade history');
+    }
+  };
+
+  const toggleTransactions = () => {
+    if (!showTransactions && portfolio?.id) {
+      loadRecentTrades();
+    }
+    setShowTransactions(!showTransactions);
   };
 
   const calculateProfitLoss = () => {
@@ -205,6 +231,68 @@ export default function Dashboard() {
               >
                 Make Your First Trade
               </button>
+            </div>
+          )}
+        </div>
+
+        {/* Recent Transactions Section */}
+        <div className="card mt-8">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Recent Transactions</h2>
+            <button
+              onClick={toggleTransactions}
+              className="btn btn-secondary text-sm"
+            >
+              {showTransactions ? 'Hide Transactions' : 'View Transactions'}
+            </button>
+          </div>
+
+          {showTransactions && (
+            <div>
+              {recentTrades.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b dark:border-gray-700">
+                        <th className="text-left py-3 px-4">Date</th>
+                        <th className="text-left py-3 px-4">Symbol</th>
+                        <th className="text-left py-3 px-4">Type</th>
+                        <th className="text-left py-3 px-4">Trade Type</th>
+                        <th className="text-right py-3 px-4">Quantity</th>
+                        <th className="text-right py-3 px-4">Price</th>
+                        <th className="text-right py-3 px-4">Total Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentTrades.map((trade) => (
+                        <tr key={trade.id} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
+                          <td className="py-3 px-4">
+                            {new Date(trade.executedAt).toLocaleString()}
+                          </td>
+                          <td className="py-3 px-4 font-medium">{trade.symbol}</td>
+                          <td className="py-3 px-4">
+                            <span className="badge badge-info">{trade.assetType}</span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className={`badge ${trade.tradeType === 'BUY' ? 'badge-success' : 'badge-danger'}`}>
+                              {trade.tradeType}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right">{trade.quantity}</td>
+                          <td className="py-3 px-4 text-right">${Number(trade.price).toFixed(2)}</td>
+                          <td className="py-3 px-4 text-right font-medium">
+                            ${Number(trade.totalValue).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-500">
+                  <p>No transactions yet. Start trading to see your history!</p>
+                </div>
+              )}
             </div>
           )}
         </div>
