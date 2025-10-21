@@ -1,350 +1,748 @@
 # Stock Market Simulation - Setup Guide
 
-This guide will help you set up and run the Stock Market Simulation & Trading Game on your local machine.
+This guide provides detailed step-by-step instructions for setting up the Stock Market Simulation & Trading Game application on your local machine.
 
-## Prerequisites
+## Table of Contents
 
-Make sure you have the following installed:
+1. [System Requirements](#system-requirements)
+2. [Installing Prerequisites](#installing-prerequisites)
+3. [Database Setup](#database-setup)
+4. [Backend Setup](#backend-setup)
+5. [Frontend Setup](#frontend-setup)
+6. [Verification](#verification)
+7. [Common Issues](#common-issues)
+8. [Production Deployment](#production-deployment)
 
-- **Node.js 18+** and npm (Download from [nodejs.org](https://nodejs.org/))
-- **Docker Desktop** (Download from [docker.com](https://www.docker.com/products/docker-desktop/))
-- **Git** (Download from [git-scm.com](https://git-scm.com/))
+---
 
-## Quick Start (Using Docker - Recommended)
+## System Requirements
 
-### 1. Clone the Repository
+### Minimum Requirements
+- **CPU**: 2+ cores
+- **RAM**: 4 GB minimum, 8 GB recommended
+- **Storage**: 2 GB free space
+- **OS**: Windows 10+, macOS 10.15+, or Linux (Ubuntu 20.04+)
 
+### Software Requirements
+- Node.js 18.x or higher
+- PostgreSQL 14.x or higher
+- Redis 6.x or higher
+- Git
+
+---
+
+## Installing Prerequisites
+
+### 1. Node.js Installation
+
+#### Windows
+1. Download the LTS installer from [nodejs.org](https://nodejs.org/)
+2. Run the installer and follow the prompts
+3. Verify installation:
 ```bash
-git clone <your-repository-url>
-cd stock-sim-trading
+node --version
+npm --version
 ```
 
-### 2. Start Database Services
-
-Start PostgreSQL and Redis using Docker Compose:
-
+#### macOS
+Using Homebrew:
 ```bash
-docker-compose up -d postgres redis
+brew install node@18
+node --version
+npm --version
 ```
 
-This will start:
-- PostgreSQL on port 5432
-- Redis on port 6379
-
-Verify services are running:
+#### Linux (Ubuntu/Debian)
 ```bash
-docker-compose ps
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
+node --version
+npm --version
 ```
 
-### 3. Setup Backend
+### 2. PostgreSQL Installation
 
-Navigate to the backend directory:
+#### Windows
+1. Download from [postgresql.org/download/windows](https://www.postgresql.org/download/windows/)
+2. Run the installer (recommended version: 14 or higher)
+3. During installation:
+   - Set password for postgres user (remember this!)
+   - Default port: 5432
+   - Install pgAdmin 4 (recommended for database management)
+
+Verify installation:
 ```bash
-cd backend
+psql --version
 ```
 
-Install dependencies:
+If `psql` is not found, add to PATH:
+- Default location: `C:\Program Files\PostgreSQL\<version>\bin`
+
+#### macOS
+Using Homebrew:
 ```bash
-npm install
+brew install postgresql@14
+brew services start postgresql@14
+psql --version
 ```
 
-Create environment file:
+#### Linux (Ubuntu/Debian)
 ```bash
-cp .env.example .env
-```
-
-Edit `.env` and add your API keys (optional for development):
-```env
-DATABASE_URL="postgresql://stocksim:password@localhost:5432/stocksim?schema=public"
-JWT_SECRET="your-super-secret-jwt-key"
-JWT_REFRESH_SECRET="your-super-secret-refresh-key"
-REDIS_URL="redis://localhost:6379"
-ALPHA_VANTAGE_API_KEY="your-api-key-here-optional"
-```
-
-Run Prisma migrations to create database tables:
-```bash
-npx prisma migrate dev --name init
-```
-
-Generate Prisma Client:
-```bash
-npx prisma generate
-```
-
-Seed the database with sample data:
-```bash
-npm run seed
-```
-
-Start the backend development server:
-```bash
-npm run dev
-```
-
-The backend API should now be running on http://localhost:3001
-
-### 4. Setup Frontend
-
-Open a new terminal and navigate to the frontend directory:
-```bash
-cd frontend
-```
-
-Install dependencies:
-```bash
-npm install
-```
-
-Create environment file:
-```bash
-cp .env.example .env
-```
-
-The default `.env` should work:
-```env
-VITE_API_URL=http://localhost:3001/api
-```
-
-Start the frontend development server:
-```bash
-npm run dev
-```
-
-The frontend should now be running on http://localhost:3000
-
-### 5. Access the Application
-
-Open your browser and go to:
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:3001
-- **API Health Check**: http://localhost:3001/api/health
-
-### 6. Login with Demo Account
-
-Use these credentials to login:
-- **Email**: demo@stocksim.com
-- **Password**: Demo123!
-
-Additional demo accounts:
-- pro@stocksim.com / Demo123!
-- crypto@stocksim.com / Demo123!
-
-## Manual Setup (Without Docker)
-
-If you prefer not to use Docker, you'll need to install PostgreSQL and Redis manually.
-
-### Install PostgreSQL
-
-**Windows**: Download from [postgresql.org](https://www.postgresql.org/download/windows/)
-
-**macOS**:
-```bash
-brew install postgresql@15
-brew services start postgresql@15
-```
-
-**Linux**:
-```bash
-sudo apt-get install postgresql-15
+sudo apt update
+sudo apt install postgresql postgresql-contrib
 sudo systemctl start postgresql
+sudo systemctl enable postgresql
+psql --version
 ```
 
-Create database:
-```sql
-CREATE DATABASE stocksim;
-CREATE USER stocksim WITH PASSWORD 'password';
-GRANT ALL PRIVILEGES ON DATABASE stocksim TO stocksim;
+### 3. Redis Installation
+
+#### Windows
+1. Download Redis for Windows from [github.com/microsoftarchive/redis/releases](https://github.com/microsoftarchive/redis/releases)
+2. Extract and run `redis-server.exe`
+
+Or use Docker:
+```bash
+docker run -d -p 6379:6379 --name redis redis:latest
 ```
 
-### Install Redis
-
-**Windows**: Download from [redis.io](https://redis.io/download/) or use WSL
-
-**macOS**:
+#### macOS
 ```bash
 brew install redis
 brew services start redis
 ```
 
-**Linux**:
+#### Linux (Ubuntu/Debian)
 ```bash
-sudo apt-get install redis-server
-sudo systemctl start redis
+sudo apt update
+sudo apt install redis-server
+sudo systemctl start redis-server
+sudo systemctl enable redis-server
 ```
 
-Then follow steps 3-6 from the Quick Start guide above.
-
-## Troubleshooting
-
-### Port Already in Use
-
-If ports 3000, 3001, 5432, or 6379 are already in use:
-
-**Check what's using the port** (Windows):
+Verify Redis:
 ```bash
-netstat -ano | findstr :3001
+redis-cli ping
+# Should return: PONG
 ```
 
-**Check what's using the port** (macOS/Linux):
+### 4. Git Installation
+
+#### Windows
+Download from [git-scm.com](https://git-scm.com/download/win) and run the installer.
+
+#### macOS
 ```bash
-lsof -i :3001
+brew install git
 ```
 
-**Kill the process** or change the port in `.env` files.
+#### Linux (Ubuntu/Debian)
+```bash
+sudo apt update
+sudo apt install git
+```
 
-### Database Connection Errors
+Verify:
+```bash
+git --version
+```
 
-1. Make sure Docker containers are running:
-   ```bash
-   docker-compose ps
-   ```
+---
 
-2. Check container logs:
-   ```bash
-   docker-compose logs postgres
-   ```
+## Database Setup
 
-3. Restart containers:
-   ```bash
-   docker-compose restart postgres redis
-   ```
+### 1. Create PostgreSQL Database
 
-### Prisma Errors
+#### Method 1: Using psql (Command Line)
 
-If you encounter Prisma errors:
+**Windows** (PowerShell):
+```powershell
+# Set password environment variable
+$env:PGPASSWORD="your_postgres_password"
 
-1. Reset the database:
-   ```bash
-   npx prisma migrate reset
-   ```
+# Connect to PostgreSQL
+& "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -d postgres
 
-2. Regenerate Prisma Client:
-   ```bash
-   npx prisma generate
-   ```
+# Or if psql is in PATH:
+psql -U postgres -d postgres
+```
 
-3. Run migrations again:
-   ```bash
-   npx prisma migrate dev
-   ```
+**macOS/Linux**:
+```bash
+sudo -u postgres psql
+```
 
-### Frontend Build Errors
+Once in psql, run:
+```sql
+-- Create database
+CREATE DATABASE stocksim;
 
-1. Clear node_modules and reinstall:
-   ```bash
-   rm -rf node_modules package-lock.json
-   npm install
-   ```
+-- Create user (optional - for production)
+CREATE USER stocksim WITH PASSWORD 'password';
 
-2. Clear Vite cache:
-   ```bash
-   rm -rf node_modules/.vite
-   ```
+-- Grant privileges
+GRANT ALL PRIVILEGES ON DATABASE stocksim TO stocksim;
 
-### API Connection Errors
+-- Exit
+\q
+```
 
-1. Make sure backend is running on port 3001
-2. Check `VITE_API_URL` in frontend `.env`
-3. Check browser console for CORS errors
-4. Verify backend is allowing requests from `http://localhost:3000`
+#### Method 2: Using pgAdmin 4
 
-## Development Tools
+1. Open pgAdmin 4
+2. Connect to PostgreSQL server (localhost)
+3. Right-click "Databases" → "Create" → "Database"
+4. Name: `stocksim`
+5. Owner: `postgres` (or create a new user)
+6. Click "Save"
 
-### Prisma Studio
+### 2. Verify Database Connection
 
-View and edit your database with a GUI:
+**Windows**:
+```powershell
+$env:PGPASSWORD="password"
+& "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -d stocksim -c "SELECT version();"
+```
+
+**macOS/Linux**:
+```bash
+psql -U postgres -d stocksim -c "SELECT version();"
+```
+
+You should see PostgreSQL version information.
+
+---
+
+## Backend Setup
+
+### 1. Clone the Repository
+
+```bash
+git clone <repository-url>
+cd stock-sim-trading/backend
+```
+
+### 2. Install Dependencies
+
+```bash
+npm install
+```
+
+This will install all backend dependencies including:
+- Express.js
+- Prisma
+- JWT libraries
+- Redis client
+- And more...
+
+### 3. Configure Environment Variables
+
+Create a `.env` file in the `backend/` directory:
+
+```bash
+# Windows (PowerShell)
+New-Item -Path .env -ItemType File
+
+# macOS/Linux
+touch .env
+```
+
+Edit `.env` and add the following (adjust values as needed):
+
+```env
+# Database Configuration
+DATABASE_URL="postgresql://postgres:password@localhost:5432/stocksim?schema=public"
+
+# JWT Configuration
+JWT_SECRET="your-super-secret-jwt-key-change-this-in-production-min-32-chars"
+JWT_EXPIRES_IN="7d"
+JWT_REFRESH_SECRET="your-refresh-token-secret-also-change-this-min-32-chars"
+JWT_REFRESH_EXPIRES_IN="30d"
+
+# API Keys
+ALPHA_VANTAGE_API_KEY="your-alpha-vantage-api-key"
+# Get free key at: https://www.alphavantage.co/support/#api-key
+
+# Redis Configuration
+REDIS_URL="redis://localhost:6379"
+
+# Server Configuration
+NODE_ENV="development"
+PORT=3001
+FRONTEND_URL="http://localhost:5173"
+
+# Rate Limiting
+RATE_LIMIT_WINDOW_MS="900000"
+RATE_LIMIT_MAX_REQUESTS="100"
+
+# Cache Configuration
+MARKET_DATA_CACHE_TTL="300"
+```
+
+**Important Notes:**
+- Replace `password` with your actual PostgreSQL password
+- Generate strong random secrets for JWT_SECRET and JWT_REFRESH_SECRET
+- Get a free Alpha Vantage API key from [alphavantage.co](https://www.alphavantage.co/support/#api-key)
+- FRONTEND_URL should match your Vite dev server (default: port 5173)
+
+### 4. Generate Prisma Client
+
+```bash
+npx prisma generate
+```
+
+This generates the Prisma Client based on your schema.
+
+### 5. Initialize Database Schema
+
+**Option A: Push schema without migrations** (recommended for development):
+```bash
+npx prisma db push
+```
+
+**Option B: Create and run migrations**:
+```bash
+npm run migrate
+```
+
+Verify schema in pgAdmin or using:
+```bash
+npx prisma studio
+```
+This opens a web interface at http://localhost:5555 to view your database.
+
+### 6. Seed the Database
+
+Populate the database with sample data:
+
+```bash
+npm run seed
+```
+
+This creates:
+- 3 demo users (demo@example.com, user1@example.com, user2@example.com)
+- Initial portfolios with $100,000 cash
+- Sample achievements
+- Sample challenges
+- Test trades
+
+**Demo Account Credentials:**
+- Email: `demo@example.com`
+- Password: `password123`
+
+### 7. Start the Backend Server
+
+```bash
+npm run dev
+```
+
+Expected output:
+```
+[INFO] Redis client connected
+[INFO] Database connected successfully
+[INFO] Scheduled jobs initialized successfully
+[INFO] Server running on port 3001
+[INFO] Environment: development
+```
+
+The backend API is now running at: **http://localhost:3001**
+
+### 8. Test Backend API
+
+Open a new terminal and test:
+
+```bash
+# Windows PowerShell
+curl http://localhost:3001/api/market/trending
+
+# macOS/Linux
+curl http://localhost:3001/api/market/trending
+```
+
+You should receive a JSON response with trending stocks.
+
+---
+
+## Frontend Setup
+
+### 1. Navigate to Frontend Directory
+
+```bash
+cd ../frontend
+# Or from root: cd stock-sim-trading/frontend
+```
+
+### 2. Install Dependencies
+
+```bash
+npm install
+```
+
+This installs:
+- React 19
+- Vite
+- Tailwind CSS
+- React Router
+- Axios
+- Recharts
+- And more...
+
+### 3. Configure Environment (Optional)
+
+The frontend uses the default backend URL `http://localhost:3001`. If your backend runs on a different port, create a `.env` file:
+
+```env
+VITE_API_URL=http://localhost:3001
+```
+
+### 4. Start the Frontend Server
+
+```bash
+npm run dev
+```
+
+Expected output:
+```
+  VITE v7.1.7  ready in 523 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+  ➜  press h + enter to show help
+```
+
+The frontend is now running at: **http://localhost:5173**
+
+---
+
+## Verification
+
+### 1. Open the Application
+
+Navigate to **http://localhost:5173** in your browser.
+
+### 2. Login with Demo Account
+
+- Email: `demo@example.com`
+- Password: `password123`
+
+### 3. Test Core Features
+
+#### a) View Dashboard
+- Should display portfolio value ($100,000 initial)
+- Holdings list (initially empty)
+- Recent transactions toggle
+
+#### b) Search and Buy Stock
+1. Click "Market" in navigation
+2. Search for a stock (e.g., "AAPL")
+3. Click on a result
+4. Enter quantity (e.g., 10 shares)
+5. Click "Buy"
+6. Verify success toast notification
+
+#### c) View Transaction
+1. Return to Dashboard
+2. Click "View Transactions"
+3. Verify your purchase appears in the list
+
+#### d) Check Holdings
+- Your purchased stock should appear in holdings
+- Cash balance should be reduced
+- Total portfolio value should reflect current stock price
+
+#### e) View Leaderboard
+- Click "Leaderboard" in navigation
+- Should show rankings by period
+- Your account should appear in the list
+
+#### f) View Achievements
+- Click "Achievements" in navigation
+- Should display available achievements
+- Some may already be unlocked
+
+### 4. Check Backend Logs
+
+In the backend terminal, you should see:
+```
+[INFO] GET /api/portfolios - 200 - User: <userId>
+[INFO] POST /api/trades/buy - 200 - User: <userId>
+[INFO] GET /api/trades/history - 200 - User: <userId>
+```
+
+### 5. Verify Database Changes
+
+**Using Prisma Studio:**
 ```bash
 cd backend
-npm run studio
+npx prisma studio
 ```
 
-Opens Prisma Studio at http://localhost:5555
+Navigate to http://localhost:5555 and check:
+- `trades` table: Your new trade should be there
+- `holdings` table: Your stock holding should appear
+- `portfolios` table: Cash balance should be updated
 
-### Database Logs
+**Using pgAdmin 4:**
+```sql
+-- View recent trades
+SELECT * FROM trades ORDER BY "executedAt" DESC LIMIT 5;
 
-View PostgreSQL logs:
+-- View holdings
+SELECT * FROM holdings WHERE quantity > 0;
+
+-- View portfolio balances
+SELECT id, "userId", "cashBalance" FROM portfolios;
+```
+
+---
+
+## Common Issues
+
+### Issue 1: Port Already in Use
+
+**Error**: `EADDRINUSE: address already in use :::3001`
+
+**Solution (Windows)**:
 ```bash
-docker-compose logs -f postgres
+netstat -ano | findstr ":3001"
+taskkill //F //PID <PID>
 ```
 
-View Redis logs:
+**Solution (macOS/Linux)**:
 ```bash
-docker-compose logs -f redis
+lsof -ti:3001 | xargs kill -9
 ```
 
-### API Testing
+### Issue 2: Database Connection Failed
 
-Use the API health check endpoint:
+**Error**: `Error: connect ECONNREFUSED 127.0.0.1:5432`
+
+**Solutions**:
+1. Verify PostgreSQL is running:
+   - Windows: Check Services (`services.msc`)
+   - macOS: `brew services list`
+   - Linux: `sudo systemctl status postgresql`
+
+2. Check DATABASE_URL in `.env`:
+   - Correct format: `postgresql://USER:PASSWORD@HOST:PORT/DATABASE`
+   - Verify password is correct
+   - Ensure database `stocksim` exists
+
+3. Test connection manually:
 ```bash
-curl http://localhost:3001/api/health
+psql -U postgres -d stocksim -c "SELECT 1;"
 ```
 
-Test authentication:
+### Issue 3: Redis Connection Failed
+
+**Error**: `Error: connect ECONNREFUSED 127.0.0.1:6379`
+
+**Solutions**:
+1. Start Redis:
+   - Windows: Run `redis-server.exe`
+   - macOS: `brew services start redis`
+   - Linux: `sudo systemctl start redis-server`
+
+2. Test connection:
 ```bash
-curl -X POST http://localhost:3001/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"demo@stocksim.com","password":"Demo123!"}'
+redis-cli ping
 ```
 
-## Building for Production
+3. If using Docker:
+```bash
+docker ps  # Check if redis container is running
+docker start redis  # Start if stopped
+```
 
-### Backend
+### Issue 4: Prisma Client Not Generated
 
-Build TypeScript:
+**Error**: `Cannot find module '@prisma/client'`
+
+**Solution**:
 ```bash
 cd backend
+npx prisma generate
+npm install
+```
+
+### Issue 5: Environment Variables Not Loaded
+
+**Error**: `Invalid environment variables`
+
+**Solutions**:
+1. Verify `.env` file exists in `backend/` directory
+2. Check for syntax errors (no spaces around `=`)
+3. Ensure all required variables are set
+4. Restart the backend server after changes
+
+### Issue 6: Alpha Vantage API Key Invalid
+
+**Error**: Market data not loading
+
+**Solutions**:
+1. Get a free API key: https://www.alphavantage.co/support/#api-key
+2. Add to `.env`: `ALPHA_VANTAGE_API_KEY="your-key"`
+3. Restart backend
+4. The app will fall back to Yahoo Finance if needed
+
+### Issue 7: CORS Errors in Browser
+
+**Error**: `Access-Control-Allow-Origin` errors
+
+**Solutions**:
+1. Verify `FRONTEND_URL` in backend `.env` matches your frontend URL
+2. Default should be: `http://localhost:5173`
+3. If using a different port, update accordingly
+4. Restart backend after changes
+
+### Issue 8: TypeScript Compilation Errors
+
+**Error**: `TSError: Unable to compile TypeScript`
+
+**Solutions**:
+```bash
+# Backend
+cd backend
+npm install
+npx tsc --noEmit  # Check for errors
+
+# Frontend
+cd frontend
+npm install
+npm run build  # Check for errors
+```
+
+### Issue 9: Seed Script Fails
+
+**Error**: Database seeding fails
+
+**Solutions**:
+1. Reset database:
+```bash
+npx prisma db push --force-reset
+```
+
+2. Re-run seed:
+```bash
+npm run seed
+```
+
+3. Check for existing data conflicts in pgAdmin
+
+---
+
+## Production Deployment
+
+### 1. Environment Configuration
+
+Create production `.env`:
+```env
+NODE_ENV="production"
+DATABASE_URL="<production-database-url>"
+REDIS_URL="<production-redis-url>"
+JWT_SECRET="<strong-random-secret-min-32-chars>"
+JWT_REFRESH_SECRET="<strong-random-refresh-secret>"
+ALPHA_VANTAGE_API_KEY="<your-api-key>"
+FRONTEND_URL="https://your-domain.com"
+```
+
+### 2. Database Migration
+
+```bash
+cd backend
+npm run migrate:deploy
+```
+
+### 3. Build Backend
+
+```bash
 npm run build
 ```
 
-Run production server:
-```bash
-npm start
-```
+This compiles TypeScript to JavaScript in the `dist/` folder.
 
-### Frontend
+### 4. Build Frontend
 
-Build production bundle:
 ```bash
 cd frontend
 npm run build
 ```
 
-Preview production build:
+This creates optimized production build in `dist/` folder.
+
+### 5. Start Production Server
+
 ```bash
-npm run preview
+cd backend
+npm start
 ```
 
-### Docker Production Build
+### 6. Deployment Options
 
-Build all services:
+#### Option A: Traditional VPS (DigitalOcean, Linode, AWS EC2)
+1. Set up Ubuntu server
+2. Install Node.js, PostgreSQL, Redis
+3. Clone repository
+4. Configure environment variables
+5. Use PM2 for process management:
 ```bash
-docker-compose -f docker-compose.yml up --build
+npm install -g pm2
+pm2 start dist/index.js --name stock-sim-backend
+pm2 startup
+pm2 save
 ```
 
-## Next Steps
+#### Option B: Docker Deployment
+```bash
+docker-compose -f docker-compose.prod.yml up -d
+```
 
-After successful setup:
+#### Option C: Platform-as-a-Service
+- **Backend**: Railway, Render, Heroku
+- **Frontend**: Vercel, Netlify, Cloudflare Pages
+- **Database**: Railway PostgreSQL, Neon, Supabase
+- **Redis**: Upstash, Redis Cloud
 
-1. Explore the **Dashboard** to see your portfolio
-2. Check the **API Documentation** in README.md
-3. Try making trades with demo data
-4. Review the code structure to understand the architecture
-5. Start customizing features to your needs
+### 7. Security Checklist
 
-## Getting Help
+- [ ] Strong JWT secrets (min 32 characters, random)
+- [ ] Secure database password
+- [ ] HTTPS/SSL certificates configured
+- [ ] CORS limited to specific domain
+- [ ] Rate limiting enabled
+- [ ] Environment variables not in code
+- [ ] Database backups configured
+- [ ] Firewall rules configured
+- [ ] Regular security updates
 
-- Check the main [README.md](README.md) for API documentation
-- Review the [database schema](backend/prisma/schema.prisma)
-- Look at example implementations in the codebase
-- Open an issue on GitHub if you encounter bugs
+---
 
-## Important Notes
+## Additional Resources
 
-- The demo uses **mock market data** when no Alpha Vantage API key is provided
-- All trades are **paper trading** - no real money involved
-- Database is reset when running `npm run seed`
-- Keep your JWT secrets secure in production
-- Never commit `.env` files to version control
+### Documentation
+- [Prisma Documentation](https://www.prisma.io/docs)
+- [Express.js Guide](https://expressjs.com/en/guide/routing.html)
+- [React Documentation](https://react.dev)
+- [Vite Guide](https://vitejs.dev/guide/)
+- [PostgreSQL Manual](https://www.postgresql.org/docs/)
 
-Happy Trading! 📈
+### Tools
+- **pgAdmin 4**: PostgreSQL database management
+- **Prisma Studio**: Visual database editor
+- **RedisInsight**: Redis visualization tool
+- **Postman**: API testing
+- **VS Code Extensions**:
+  - Prisma (syntax highlighting)
+  - ESLint
+  - Prettier
+  - Tailwind CSS IntelliSense
+
+### Getting Help
+- Check [README.md](README.md) for overview
+- Review [docs/API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md) for API details
+- See [docs/DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md) for schema info
+- Open GitHub issue for bugs
+
+---
+
+**Setup Complete!** You should now have a fully functional stock trading simulation platform running locally.
