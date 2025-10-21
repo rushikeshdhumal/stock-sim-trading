@@ -28,7 +28,13 @@
       "Bash(cat index.ts)",
       "Bash(netstat -ano)",
       "Bash(findstr \":3001\")",
-      "Bash(taskkill //F //PID 19916)"
+      "Bash(taskkill //F //PID 19916)",
+      "Bash(tree:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(xargs:*)",
+      "Bash(rm:*)",
+      "Bash(rmdir:*)"
     ],
     "deny": [],
     "ask": []
