@@ -22,7 +22,7 @@ export default function Navigation() {
           <Link to="/dashboard" className="flex items-center gap-2">
             <span className="text-2xl font-bold text-primary-600">📈</span>
             <h1 className="text-xl md:text-2xl font-bold text-primary-600">
-              Stock Sim Trading
+              Trading and Simulation
             </h1>
           </Link>
 
