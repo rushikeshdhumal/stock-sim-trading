@@ -366,14 +366,6 @@ The application automatically falls back to Yahoo Finance when Alpha Vantage rat
 - **API Throttling**: Request queuing prevents rate limit errors (future enhancement)
 - **Lazy Loading**: Frontend components load on demand
 
-## Demo Guide
-
-For a 5-minute live demonstration, see [docs/DEMO_GUIDE.md](docs/DEMO_GUIDE.md) which includes:
-- Person-by-person script for 4-person team
-- Database queries to run during demo
-- pgAdmin 4 setup instructions
-- Key features to highlight
-
 ## Testing
 
 ### Backend Testing
