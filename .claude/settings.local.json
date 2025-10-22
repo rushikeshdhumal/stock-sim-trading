@@ -42,7 +42,15 @@
       "Bash(curl:*)",
       "Bash(pip install:*)",
       "Bash(python yfinance-service.py:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(\"C:\\Program Files\\PostgreSQL\\17\\bin\\psql.exe\" -U postgres -d stocksim -c \"SELECT email, username FROM users LIMIT 5;\")",
+      "Bash(\"C:\\Program Files\\PostgreSQL\\17\\bin\\psql.exe\" -U postgres -d stocksim -c \"SELECT id, symbol, trade_type, quantity, price, total_value, executed_at FROM trades ORDER BY executed_at DESC LIMIT 1;\")",
+      "Bash(\"C:\\Program Files\\PostgreSQL\\17\\bin\\psql.exe\" -U postgres -d stocksim -c \"SELECT symbol, quantity, average_cost FROM holdings WHERE portfolio_id = ''61f79b37-d428-4eb2-bb92-277ecd2e86f8'' ORDER BY created_at DESC;\")",
+      "Bash(taskkill //F //PID 19788)",
+      "Bash(taskkill //F //PID 19480)",
+      "Bash(taskkill //F //PID 20296)",
+      "Bash(taskkill //F //PID 2728)",
+      "Bash(taskkill:*)"
     ],
     "deny": [],
     "ask": []
