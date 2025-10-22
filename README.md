@@ -356,7 +356,7 @@ lsof -ti:3001 | xargs kill -9
 ```
 
 ### Alpha Vantage Rate Limit
-The application automatically falls back to Yahoo Finance when Alpha Vantage rate limits are hit (5 requests/minute on free tier). Consider upgrading to a paid plan for higher limits.
+The application automatically falls back to Yahoo Finance when Alpha Vantage rate limits are hit (5 requests/minute on the free tier). Consider upgrading to a paid plan for higher limits.
 
 ## Performance Considerations
 
@@ -365,14 +365,6 @@ The application automatically falls back to Yahoo Finance when Alpha Vantage rat
 - **Connection Pooling**: Prisma manages PostgreSQL connection pool
 - **API Throttling**: Request queuing prevents rate limit errors (future enhancement)
 - **Lazy Loading**: Frontend components load on demand
-
-## Demo Guide
-
-For a 5-minute live demonstration, see [docs/DEMO_GUIDE.md](docs/DEMO_GUIDE.md) which includes:
-- Person-by-person script for 4-person team
-- Database queries to run during demo
-- pgAdmin 4 setup instructions
-- Key features to highlight
 
 ## Testing
 
