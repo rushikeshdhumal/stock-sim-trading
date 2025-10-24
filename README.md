@@ -356,7 +356,7 @@ lsof -ti:3001 | xargs kill -9
 ```
 
 ### Alpha Vantage Rate Limit
-The application automatically falls back to Yahoo Finance when Alpha Vantage rate limits are hit (5 requests/minute on free tier). Consider upgrading to a paid plan for higher limits.
+The application automatically falls back to Yahoo Finance when Alpha Vantage rate limits are hit (5 requests/minute on the free tier). Consider upgrading to a paid plan for higher limits.
 
 ## Performance Considerations
 

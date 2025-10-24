@@ -29,6 +29,7 @@ postgres-data/
 *.swo
 *~
 .DS_Store
+.claude/
 
 # Testing
 coverage/
