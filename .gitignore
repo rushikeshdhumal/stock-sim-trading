@@ -38,6 +38,9 @@ coverage/
 logs/
 *.log
 
+# Documentation
+docs/TEAM_PROJECT_PLAN.md
+
 # Docker
 docker-compose.override.yml
 
