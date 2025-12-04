@@ -14,6 +14,7 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string(),
   JWT_REFRESH_EXPIRES_IN: z.string().default('30d'),
   ALPHA_VANTAGE_API_KEY: z.string().optional(),
+  FINNHUB_API_KEY: z.string().optional(),
   FRONTEND_URL: z.string().default('http://localhost:3000'),
   RATE_LIMIT_WINDOW_MS: z.string().default('900000'),
   RATE_LIMIT_MAX_REQUESTS: z.string().default('100'),
