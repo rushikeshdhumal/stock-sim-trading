@@ -5,6 +5,7 @@ import { env } from '../config/env';
 import { AppError } from '../middleware/errorHandler';
 import { MarketQuote } from '../types';
 import logger from '../config/logger';
+import { alphaVantageQueue, yfinanceQueue, finnhubQueue } from '../utils/requestQueue';
 
 const prisma = getPrismaClient();
 const CACHE_TTL = parseInt(env.MARKET_DATA_CACHE_TTL);
@@ -45,6 +46,87 @@ export class MarketDataService {
     await this.setCacheQuote(cacheKey, quote);
 
     return quote;
+  }
+
+  /**
+   * Get quotes for multiple symbols (batch operation)
+   * Significantly faster than calling getQuote multiple times
+   */
+  async getQuoteBatch(symbols: string[]): Promise<Map<string, MarketQuote>> {
+    if (symbols.length === 0) {
+      return new Map();
+    }
+
+    const results = new Map<string, MarketQuote>();
+    const uncachedSymbols: string[] = [];
+
+    // Check cache for each symbol
+    for (const symbol of symbols) {
+      const cacheKey = `quote:${symbol}`;
+
+      try {
+        // Try Redis cache first
+        const cached = await cacheGet(cacheKey);
+        if (cached) {
+          results.set(symbol, JSON.parse(cached));
+          continue;
+        }
+
+        // Try database cache
+        const dbCache = await prisma.marketDataCache.findUnique({
+          where: { symbol },
+        });
+
+        if (dbCache && this.isCacheValid(dbCache.lastUpdated)) {
+          const quote = this.formatQuote(dbCache);
+          results.set(symbol, quote);
+          await this.setCacheQuote(cacheKey, quote);
+          continue;
+        }
+
+        // Symbol not in cache, needs API fetch
+        uncachedSymbols.push(symbol);
+      } catch (error) {
+        logger.warn(`Cache error for ${symbol}:`, error);
+        uncachedSymbols.push(symbol);
+      }
+    }
+
+    // If all symbols were cached, return early
+    if (uncachedSymbols.length === 0) {
+      logger.info(`Batch request: All ${symbols.length} symbols served from cache`);
+      return results;
+    }
+
+    logger.info(`Batch request: ${results.size} from cache, ${uncachedSymbols.length} need API fetch`);
+
+    // Fetch uncached symbols from API (batch operation)
+    try {
+      const batchQuotes = await this.fetchQuoteBatchFromAPI(uncachedSymbols);
+
+      // Update caches and add to results
+      for (const [symbol, quote] of batchQuotes.entries()) {
+        results.set(symbol, quote);
+        await this.updateMarketDataCache(symbol, quote);
+        await this.setCacheQuote(`quote:${symbol}`, quote);
+      }
+    } catch (error) {
+      logger.error('Batch API fetch failed:', error);
+      // Fall back to individual fetches for uncached symbols
+      logger.info('Falling back to individual fetches...');
+      for (const symbol of uncachedSymbols) {
+        try {
+          const quote = await this.fetchQuoteFromAPI(symbol);
+          results.set(symbol, quote);
+          await this.updateMarketDataCache(symbol, quote);
+          await this.setCacheQuote(`quote:${symbol}`, quote);
+        } catch (err) {
+          logger.error(`Failed to fetch ${symbol}:`, err);
+        }
+      }
+    }
+
+    return results;
   }
 
   /**
@@ -127,36 +209,103 @@ export class MarketDataService {
     });
 
     const symbols = popular.map((p) => p.symbol);
-    const quotes = await Promise.all(symbols.map((symbol) => this.getQuote(symbol)));
+
+    // Use batch API for better performance
+    const quotesMap = await this.getQuoteBatch(symbols);
+
+    // Convert Map to Array, maintaining order
+    const quotes = symbols
+      .map((symbol) => quotesMap.get(symbol))
+      .filter((quote): quote is MarketQuote => quote !== undefined);
 
     return quotes;
   }
 
   /**
    * Fetch quote from external API with fallback chain
-   * Priority: Alpha Vantage -> yfinance -> Mock Data
+   * Priority: Alpha Vantage -> yfinance -> Finnhub
+   * Uses request queues to prevent rate limiting
    */
   private async fetchQuoteFromAPI(symbol: string): Promise<MarketQuote> {
-    // Try Alpha Vantage first
+    let quote: MarketQuote | null = null;
+
+    // Try Alpha Vantage first (Primary)
     if (env.ALPHA_VANTAGE_API_KEY) {
       try {
-        return await this.fetchFromAlphaVantage(symbol);
+        quote = await alphaVantageQueue.add(() => this.fetchFromAlphaVantage(symbol));
+        if (quote) return quote;
       } catch (error: any) {
-        // If rate limited (429) or other error, try yfinance
-        logger.warn(`Alpha Vantage failed for ${symbol}, trying yfinance:`, error.message);
+        logger.warn(`Alpha Vantage failed for ${symbol}:`, error.message);
       }
     }
 
-    // Try yfinance service
+    // Try yfinance service (Secondary)
     try {
-      return await this.fetchFromYFinance(symbol);
-    } catch (error) {
-      logger.warn(`yfinance failed for ${symbol}, using mock data:`, error);
+      quote = await yfinanceQueue.add(() => this.fetchFromYFinance(symbol));
+      if (quote) return quote;
+    } catch (error: any) {
+      logger.warn(`yfinance failed for ${symbol}:`, error.message);
     }
 
-    // Fallback to mock data
-    logger.warn(`All APIs failed for ${symbol}, returning mock data`);
-    return this.getMockQuote(symbol);
+    // Try Finnhub (Tertiary)
+    if (env.FINNHUB_API_KEY) {
+      try {
+        quote = await finnhubQueue.add(() => this.fetchFromFinnhub(symbol));
+        if (quote) return quote;
+      } catch (error: any) {
+        logger.warn(`Finnhub failed for ${symbol}:`, error.message);
+      }
+    }
+
+    // If all APIs failed, throw error
+    throw new AppError(`Unable to fetch quote for ${symbol} from any API`, 503);
+  }
+
+  /**
+   * Fetch quotes for multiple symbols from API (batch operation)
+   * Priority: Alpha Vantage batch -> Finnhub parallel -> Individual fallback
+   */
+  private async fetchQuoteBatchFromAPI(symbols: string[]): Promise<Map<string, MarketQuote>> {
+    let quotes = new Map<string, MarketQuote>();
+
+    // Try Alpha Vantage batch API first (Primary)
+    if (env.ALPHA_VANTAGE_API_KEY && symbols.length > 0) {
+      try {
+        quotes = await alphaVantageQueue.add(() => this.fetchBatchFromAlphaVantage(symbols));
+        if (quotes.size > 0) {
+          logger.info(`Alpha Vantage batch: Successfully fetched ${quotes.size}/${symbols.length} symbols`);
+          return quotes;
+        }
+      } catch (error: any) {
+        logger.warn(`Alpha Vantage batch failed:`, error.message);
+      }
+    }
+
+    // Try Finnhub parallel fetches (Tertiary - faster than sequential)
+    if (env.FINNHUB_API_KEY && symbols.length > 0) {
+      try {
+        quotes = await this.fetchBatchFromFinnhub(symbols);
+        if (quotes.size > 0) {
+          logger.info(`Finnhub batch: Successfully fetched ${quotes.size}/${symbols.length} symbols`);
+          return quotes;
+        }
+      } catch (error: any) {
+        logger.warn(`Finnhub batch failed:`, error.message);
+      }
+    }
+
+    // Fallback: Try yfinance if available
+    try {
+      quotes = await this.fetchBatchFromYFinance(symbols);
+      if (quotes.size > 0) {
+        logger.info(`yfinance batch: Successfully fetched ${quotes.size}/${symbols.length} symbols`);
+        return quotes;
+      }
+    } catch (error: any) {
+      logger.warn(`yfinance batch failed:`, error.message);
+    }
+
+    throw new AppError(`Unable to fetch batch quotes for ${symbols.length} symbols from any API`, 503);
   }
 
   /**
@@ -220,32 +369,148 @@ export class MarketDataService {
   }
 
   /**
-   * Get mock quote for development
+   * Fetch from Finnhub API
    */
-  private getMockQuote(symbol: string): MarketQuote {
-    const mockPrices: { [key: string]: number } = {
-      AAPL: 178.25,
-      GOOGL: 142.5,
-      MSFT: 385.0,
-      TSLA: 242.5,
-      AMZN: 152.75,
-      BTC: 43250.0,
-      ETH: 2280.0,
-    };
+  private async fetchFromFinnhub(symbol: string): Promise<MarketQuote> {
+    const url = `https://finnhub.io/api/v1/quote`;
+    const response = await axios.get(url, {
+      params: {
+        symbol: symbol.toUpperCase(),
+        token: env.FINNHUB_API_KEY,
+      },
+      timeout: 5000,
+    });
 
-    const price = mockPrices[symbol] || 100.0;
-    const change = (Math.random() - 0.5) * 10;
+    const data = response.data;
+
+    if (!data || !data.c) {
+      throw new AppError('Symbol not found in Finnhub', 404);
+    }
 
     return {
       symbol: symbol.toUpperCase(),
-      assetType: ['BTC', 'ETH'].includes(symbol) ? 'CRYPTO' : 'STOCK',
-      currentPrice: price,
-      change24h: change,
-      changePercentage: (change / price) * 100,
-      volume: Math.floor(Math.random() * 100000000),
-      marketCap: Math.floor(Math.random() * 1000000000000),
+      assetType: 'STOCK',
+      currentPrice: data.c,
+      change24h: data.d,
+      changePercentage: data.dp,
+      volume: undefined,
+      marketCap: undefined,
       lastUpdated: new Date(),
     };
+  }
+
+  /**
+   * Fetch batch quotes from Alpha Vantage
+   * Uses BATCH_STOCK_QUOTES endpoint (up to 100 symbols)
+   */
+  private async fetchBatchFromAlphaVantage(symbols: string[]): Promise<Map<string, MarketQuote>> {
+    const quotes = new Map<string, MarketQuote>();
+
+    // Alpha Vantage batch API only supports up to 100 symbols
+    const symbolsToFetch = symbols.slice(0, 100);
+    const symbolsParam = symbolsToFetch.join(',');
+
+    const url = `https://www.alphavantage.co/query`;
+    const response = await axios.get(url, {
+      params: {
+        function: 'BATCH_STOCK_QUOTES',
+        symbols: symbolsParam,
+        apikey: env.ALPHA_VANTAGE_API_KEY,
+      },
+      timeout: 10000,
+    });
+
+    const stockQuotes = response.data['Stock Quotes'];
+
+    if (!stockQuotes || !Array.isArray(stockQuotes)) {
+      throw new AppError('Invalid response from Alpha Vantage batch API', 500);
+    }
+
+    for (const quote of stockQuotes) {
+      const symbol = quote['1. symbol'];
+      const price = parseFloat(quote['2. price']);
+      const volume = parseInt(quote['3. volume']) || undefined;
+      const timestamp = quote['4. timestamp'];
+
+      if (symbol && price) {
+        quotes.set(symbol, {
+          symbol: symbol.toUpperCase(),
+          assetType: 'STOCK',
+          currentPrice: price,
+          change24h: 0, // Batch API doesn't provide change
+          changePercentage: 0,
+          volume,
+          lastUpdated: timestamp ? new Date(timestamp) : new Date(),
+        });
+      }
+    }
+
+    return quotes;
+  }
+
+  /**
+   * Fetch batch quotes from Finnhub
+   * Makes parallel requests with rate limiting (60 req/min)
+   */
+  private async fetchBatchFromFinnhub(symbols: string[]): Promise<Map<string, MarketQuote>> {
+    const quotes = new Map<string, MarketQuote>();
+
+    // Fetch in parallel but respect rate limit
+    const promises = symbols.map((symbol) =>
+      finnhubQueue.add(() => this.fetchFromFinnhub(symbol))
+        .then((quote) => quotes.set(symbol, quote))
+        .catch((error) => {
+          logger.warn(`Finnhub failed for ${symbol}:`, error.message);
+        })
+    );
+
+    await Promise.all(promises);
+    return quotes;
+  }
+
+  /**
+   * Fetch batch quotes from yfinance
+   * The Python microservice should support batch fetching
+   */
+  private async fetchBatchFromYFinance(symbols: string[]): Promise<Map<string, MarketQuote>> {
+    const quotes = new Map<string, MarketQuote>();
+
+    // Try batch endpoint if available
+    try {
+      const url = `http://localhost:5001/quotes/batch`;
+      const response = await axios.post(url, { symbols }, { timeout: 10000 });
+
+      if (response.status === 200 && response.data) {
+        for (const [symbol, data] of Object.entries(response.data)) {
+          const quoteData = data as any;
+          quotes.set(symbol, {
+            symbol: quoteData.symbol || symbol,
+            assetType: quoteData.assetType || 'STOCK',
+            currentPrice: quoteData.currentPrice,
+            change24h: quoteData.change24h,
+            changePercentage: quoteData.changePercentage,
+            volume: quoteData.volume || undefined,
+            marketCap: quoteData.marketCap || undefined,
+            lastUpdated: new Date(),
+          });
+        }
+        return quotes;
+      }
+    } catch (error) {
+      logger.warn('yfinance batch endpoint not available, falling back to individual requests');
+    }
+
+    // Fallback: fetch individually
+    const promises = symbols.map((symbol) =>
+      yfinanceQueue.add(() => this.fetchFromYFinance(symbol))
+        .then((quote) => quotes.set(symbol, quote))
+        .catch((error) => {
+          logger.warn(`yfinance failed for ${symbol}:`, error.message);
+        })
+    );
+
+    await Promise.all(promises);
+    return quotes;
   }
 
   /**
