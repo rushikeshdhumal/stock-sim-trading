@@ -263,7 +263,7 @@ export class MarketDataService {
 
   /**
    * Fetch quotes for multiple symbols from API (batch operation)
-   * Priority: Alpha Vantage batch -> Finnhub parallel -> Individual fallback
+   * Priority: Alpha Vantage -> Finnhub parallel -> yfinance batch
    */
   private async fetchQuoteBatchFromAPI(symbols: string[]): Promise<Map<string, MarketQuote>> {
     let quotes = new Map<string, MarketQuote>();
