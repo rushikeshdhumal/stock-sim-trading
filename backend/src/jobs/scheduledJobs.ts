@@ -20,7 +20,7 @@ async function cleanupStaleMarketData() {
     },
   });
 
-  logger.info(`Cleaned up ${result.count} stale market data cache entries`);
+  logger.info(`Cleaned up ${result?.count ?? 0} stale market data cache entries`);
 }
 
 /**
