@@ -423,7 +423,7 @@ npm test -- marketDataService.test.ts
 
 ### Version 2.1.0 (2025-12-04)
 - **NEW**: Batch API request system for multiple symbols
-- **NEW**: Alpha Vantage batch quotes endpoint support
+- **NOTE**: Alpha Vantage batch quotes endpoint (`BATCH_STOCK_QUOTES`) is deprecated and not available in the free tier. Batch support for Alpha Vantage is currently unavailable.
 - **NEW**: Finnhub parallel batch fetching
 - **NEW**: yfinance batch endpoint integration
 - Updated portfolioService to use batch API (90-97% faster)
