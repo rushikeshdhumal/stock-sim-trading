@@ -10,6 +10,21 @@ import { alphaVantageQueue, yfinanceQueue, finnhubQueue } from '../utils/request
 const prisma = getPrismaClient();
 const CACHE_TTL = parseInt(env.MARKET_DATA_CACHE_TTL);
 
+// API Response Type Definitions
+interface YFinanceBatchQuote {
+  symbol?: string;
+  assetType?: string;
+  currentPrice: number;
+  change24h: number;
+  changePercentage: number;
+  volume?: number;
+  marketCap?: number;
+}
+
+interface YFinanceBatchResponse {
+  [symbol: string]: YFinanceBatchQuote;
+}
+
 export class MarketDataService {
   /**
    * Get quote for a symbol (with caching)
@@ -492,12 +507,11 @@ export class MarketDataService {
     // Try batch endpoint if available
     try {
       const url = `http://localhost:5001/quotes/batch`;
-      const response = await axios.post(url, { symbols }, { timeout: 10000 });
+      const response = await axios.post<YFinanceBatchResponse>(url, { symbols }, { timeout: 10000 });
 
       if (response.status === 200 && response.data) {
         const successCount = Object.keys(response.data).length;
-        for (const [symbol, data] of Object.entries(response.data)) {
-          const quoteData = data as any;
+        for (const [symbol, quoteData] of Object.entries(response.data)) {
           quotes.set(symbol, {
             symbol: quoteData.symbol || symbol,
             assetType: quoteData.assetType || 'STOCK',
