@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import watchlistService, { WatchlistItem } from '../services/watchlistService';
+import Navigation from '../components/Navigation';
 import { toast } from 'react-hot-toast';
 
 export default function Watchlist() {
@@ -41,39 +42,47 @@ export default function Watchlist() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <Navigation />
+        <div className="flex justify-center items-center min-h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
+        </div>
       </div>
     );
   }
 
   if (watchlist.length === 0) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">Your Watchlist</h1>
-          <p className="text-gray-600 mb-8">
-            You haven't added any symbols to your watchlist yet.
-          </p>
-          <Link
-            to="/market"
-            className="inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            Browse Market
-          </Link>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <Navigation />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Your Watchlist</h1>
+            <p className="text-gray-600 dark:text-gray-400 mb-8">
+              You haven't added any symbols to your watchlist yet.
+            </p>
+            <Link
+              to="/market"
+              className="inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              Browse Market
+            </Link>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Your Watchlist</h1>
-        <p className="mt-2 text-sm text-gray-600">
-          Track your favorite stocks and cryptocurrencies with real-time prices
-        </p>
-      </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <Navigation />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Your Watchlist</h1>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            Track your favorite stocks and cryptocurrencies with real-time prices
+          </p>
+        </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {watchlist.map((item) => (
@@ -155,6 +164,7 @@ export default function Watchlist() {
             </div>
           </div>
         ))}
+      </div>
       </div>
     </div>
   );
