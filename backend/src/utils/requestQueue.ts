@@ -35,9 +35,6 @@ export class RequestQueue {
       }
     }
     this.processing = false;
-    } else {
-      this.processing = false;
-    }
   }
 
   private delay(ms: number): Promise<void> {

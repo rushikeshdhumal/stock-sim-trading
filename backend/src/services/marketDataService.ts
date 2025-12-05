@@ -405,6 +405,8 @@ export class MarketDataService {
    */
   private async fetchBatchFromAlphaVantage(symbols: string[]): Promise<Map<string, MarketQuote>> {
     const quotes = new Map<string, MarketQuote>();
+    const failedSymbols: string[] = [];
+    const missingDataSymbols: string[] = [];
 
     // Alpha Vantage free API only supports individual GLOBAL_QUOTE requests
     const symbolsToFetch = symbols.slice(0, 100);
@@ -421,6 +423,7 @@ export class MarketDataService {
         });
         const quoteData = response.data['Global Quote'];
         if (!quoteData || !quoteData['01. symbol'] || !quoteData['05. price']) {
+          missingDataSymbols.push(symbol);
           continue; // skip if data is missing
         }
         quotes.set(symbol.toUpperCase(), {
@@ -432,10 +435,19 @@ export class MarketDataService {
           volume: parseInt(quoteData['06. volume']) || undefined,
           lastUpdated: new Date(),
         });
-      } catch (err) {
-        logger.warn(`Alpha Vantage GLOBAL_QUOTE failed for symbol ${symbol}: ${err}`);
+      } catch (err: any) {
+        failedSymbols.push(symbol);
+        logger.warn(`Alpha Vantage GLOBAL_QUOTE failed for symbol ${symbol}: ${err.message || err}`);
         continue;
       }
+    }
+
+    // Log summary of batch results
+    if (failedSymbols.length > 0) {
+      logger.warn(`Alpha Vantage batch: ${failedSymbols.length} symbols failed with errors: ${failedSymbols.join(', ')}`);
+    }
+    if (missingDataSymbols.length > 0) {
+      logger.warn(`Alpha Vantage batch: ${missingDataSymbols.length} symbols returned no data (possibly invalid): ${missingDataSymbols.join(', ')}`);
     }
 
     return quotes;
@@ -447,17 +459,25 @@ export class MarketDataService {
    */
   private async fetchBatchFromFinnhub(symbols: string[]): Promise<Map<string, MarketQuote>> {
     const quotes = new Map<string, MarketQuote>();
+    const failedSymbols: string[] = [];
 
     // Fetch in parallel but respect rate limit
     const promises = symbols.map((symbol) =>
       finnhubQueue.add(() => this.fetchFromFinnhub(symbol))
         .then((quote) => quotes.set(symbol, quote))
         .catch((error) => {
+          failedSymbols.push(symbol);
           logger.warn(`Finnhub failed for ${symbol}:`, error.message);
         })
     );
 
     await Promise.all(promises);
+
+    // Log summary of batch results
+    if (failedSymbols.length > 0) {
+      logger.warn(`Finnhub batch: ${failedSymbols.length}/${symbols.length} symbols failed: ${failedSymbols.join(', ')}`);
+    }
+
     return quotes;
   }
 
@@ -467,6 +487,7 @@ export class MarketDataService {
    */
   private async fetchBatchFromYFinance(symbols: string[]): Promise<Map<string, MarketQuote>> {
     const quotes = new Map<string, MarketQuote>();
+    const failedSymbols: string[] = [];
 
     // Try batch endpoint if available
     try {
@@ -474,6 +495,7 @@ export class MarketDataService {
       const response = await axios.post(url, { symbols }, { timeout: 10000 });
 
       if (response.status === 200 && response.data) {
+        const successCount = Object.keys(response.data).length;
         for (const [symbol, data] of Object.entries(response.data)) {
           const quoteData = data as any;
           quotes.set(symbol, {
@@ -487,6 +509,14 @@ export class MarketDataService {
             lastUpdated: new Date(),
           });
         }
+
+        // Log which symbols failed in batch response
+        if (successCount < symbols.length) {
+          const receivedSymbols = Object.keys(response.data);
+          const missingSymbols = symbols.filter(s => !receivedSymbols.includes(s));
+          logger.warn(`yfinance batch: ${missingSymbols.length}/${symbols.length} symbols returned no data: ${missingSymbols.join(', ')}`);
+        }
+
         return quotes;
       }
     } catch (error) {
@@ -498,11 +528,18 @@ export class MarketDataService {
       yfinanceQueue.add(() => this.fetchFromYFinance(symbol))
         .then((quote) => quotes.set(symbol, quote))
         .catch((error) => {
+          failedSymbols.push(symbol);
           logger.warn(`yfinance failed for ${symbol}:`, error.message);
         })
     );
 
     await Promise.all(promises);
+
+    // Log summary for individual fallback
+    if (failedSymbols.length > 0) {
+      logger.warn(`yfinance batch (individual fallback): ${failedSymbols.length}/${symbols.length} symbols failed: ${failedSymbols.join(', ')}`);
+    }
+
     return quotes;
   }
 
