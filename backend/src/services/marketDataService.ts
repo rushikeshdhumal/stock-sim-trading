@@ -406,42 +406,35 @@ export class MarketDataService {
   private async fetchBatchFromAlphaVantage(symbols: string[]): Promise<Map<string, MarketQuote>> {
     const quotes = new Map<string, MarketQuote>();
 
-    // Alpha Vantage batch API only supports up to 100 symbols
+    // Alpha Vantage free API only supports individual GLOBAL_QUOTE requests
     const symbolsToFetch = symbols.slice(0, 100);
-    const symbolsParam = symbolsToFetch.join(',');
-
-    const url = `https://www.alphavantage.co/query`;
-    const response = await axios.get(url, {
-      params: {
-        function: 'BATCH_STOCK_QUOTES',
-        symbols: symbolsParam,
-        apikey: env.ALPHA_VANTAGE_API_KEY,
-      },
-      timeout: 10000,
-    });
-
-    const stockQuotes = response.data['Stock Quotes'];
-
-    if (!stockQuotes || !Array.isArray(stockQuotes)) {
-      throw new AppError('Invalid response from Alpha Vantage batch API', 500);
-    }
-
-    for (const quote of stockQuotes) {
-      const symbol = quote['1. symbol'];
-      const price = parseFloat(quote['2. price']);
-      const volume = parseInt(quote['3. volume']) || undefined;
-      const timestamp = quote['4. timestamp'];
-
-      if (symbol && price) {
-        quotes.set(symbol, {
-          symbol: symbol.toUpperCase(),
-          assetType: 'STOCK',
-          currentPrice: price,
-          change24h: 0, // Batch API doesn't provide change
-          changePercentage: 0,
-          volume,
-          lastUpdated: timestamp ? new Date(timestamp) : new Date(),
+    for (const symbol of symbolsToFetch) {
+      try {
+        const url = `https://www.alphavantage.co/query`;
+        const response = await axios.get(url, {
+          params: {
+            function: 'GLOBAL_QUOTE',
+            symbol: symbol.toUpperCase(),
+            apikey: env.ALPHA_VANTAGE_API_KEY,
+          },
+          timeout: 10000,
         });
+        const quoteData = response.data['Global Quote'];
+        if (!quoteData || !quoteData['01. symbol'] || !quoteData['05. price']) {
+          continue; // skip if data is missing
+        }
+        quotes.set(symbol.toUpperCase(), {
+          symbol: quoteData['01. symbol'],
+          assetType: 'STOCK',
+          currentPrice: parseFloat(quoteData['05. price']),
+          change24h: parseFloat(quoteData['09. change']) || 0,
+          changePercentage: parseFloat(quoteData['10. change percent']) || 0,
+          volume: parseInt(quoteData['06. volume']) || undefined,
+          lastUpdated: new Date(),
+        });
+      } catch (err) {
+        logger.warn(`Alpha Vantage GLOBAL_QUOTE failed for symbol ${symbol}: ${err}`);
+        continue;
       }
     }
 
