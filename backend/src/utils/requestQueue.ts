@@ -22,18 +22,19 @@ export class RequestQueue {
     if (this.processing || this.queue.length === 0) return;
 
     this.processing = true;
-    const item = this.queue.shift()!;
-
-    try {
-      const result = await item.fn();
-      item.resolve(result);
-    } catch (error) {
-      item.reject(error);
+    while (this.queue.length > 0) {
+      const item = this.queue.shift()!;
+      try {
+        const result = await item.fn();
+        item.resolve(result);
+      } catch (error) {
+        item.reject(error);
+      }
+      if (this.queue.length > 0) {
+        await this.delay(this.delayMs);
+      }
     }
-
-    if (this.queue.length > 0) {
-      await this.delay(this.delayMs);
-      this.processQueue();
+    this.processing = false;
     } else {
       this.processing = false;
     }
