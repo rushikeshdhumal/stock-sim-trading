@@ -31,9 +31,12 @@ export class RequestQueue {
       item.reject(error);
     }
 
-    await this.delay(this.delayMs);
-    this.processing = false;
-    this.processQueue();
+    if (this.queue.length > 0) {
+      await this.delay(this.delayMs);
+      this.processQueue();
+    } else {
+      this.processing = false;
+    }
   }
 
   private delay(ms: number): Promise<void> {
