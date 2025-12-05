@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import marketService from '../services/marketService';
 import portfolioService from '../services/portfolioService';
+import watchlistService from '../services/watchlistService';
 import TradingModal from '../components/TradingModal';
 import Navigation from '../components/Navigation';
 import type { MarketQuote } from '../types/index.js';
@@ -17,11 +18,20 @@ export default function Market() {
   const [selectedSymbol, setSelectedSymbol] = useState('');
   const [portfolioId, setPortfolioId] = useState('');
   const [cashBalance, setCashBalance] = useState(0);
+  const [watchlistStatus, setWatchlistStatus] = useState<Map<string, boolean>>(new Map());
 
   useEffect(() => {
     loadMarketData();
     loadPortfolioData();
+    loadWatchlistStatus();
   }, []);
+
+  useEffect(() => {
+    // Update watchlist status when trending/popular data changes
+    if (trending.length > 0 || popular.length > 0) {
+      loadWatchlistStatus();
+    }
+  }, [trending, popular]);
 
   const loadMarketData = async () => {
     try {
@@ -47,6 +57,72 @@ export default function Market() {
       }
     } catch (error) {
       console.error('Failed to load portfolio:', error);
+    }
+  };
+
+  const loadWatchlistStatus = async () => {
+    try {
+      const allSymbols = [
+        ...trending.map((a) => a.symbol),
+        ...popular.map((a) => a.symbol),
+        ...searchResults.map((r) => r.symbol),
+      ];
+      const uniqueSymbols = [...new Set(allSymbols)];
+
+      const statusMap = new Map<string, boolean>();
+      await Promise.all(
+        uniqueSymbols.map(async (symbol) => {
+          try {
+            const inWatchlist = await watchlistService.checkWatchlistStatus(symbol);
+            statusMap.set(symbol, inWatchlist);
+          } catch (error) {
+            statusMap.set(symbol, false);
+          }
+        })
+      );
+      setWatchlistStatus(statusMap);
+    } catch (error) {
+      console.error('Failed to load watchlist status:', error);
+    }
+  };
+
+  const toggleWatchlist = async (
+    symbol: string,
+    assetType: 'STOCK' | 'CRYPTO',
+    e: React.MouseEvent
+  ) => {
+    e.stopPropagation(); // Prevent opening trade modal
+
+    const isInWatchlist = watchlistStatus.get(symbol);
+
+    try {
+      if (isInWatchlist) {
+        // Find the watchlist item and remove it
+        const watchlist = await watchlistService.getWatchlist();
+        const item = watchlist.find((w) => w.symbol === symbol);
+        if (item) {
+          await watchlistService.removeFromWatchlist(item.id);
+          toast.success(`${symbol} removed from watchlist`);
+        }
+      } else {
+        await watchlistService.addToWatchlist(symbol, assetType);
+        toast.success(`${symbol} added to watchlist`);
+      }
+
+      // Update status
+      setWatchlistStatus((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(symbol, !isInWatchlist);
+        return newMap;
+      });
+    } catch (error: any) {
+      if (error.response?.data?.error?.includes('already in watchlist')) {
+        toast.error('Already in watchlist');
+      } else {
+        toast.error(
+          error.response?.data?.error || 'Failed to update watchlist'
+        );
+      }
     }
   };
 
@@ -76,40 +152,77 @@ export default function Market() {
     loadPortfolioData();
   };
 
-  const renderAssetCard = (asset: MarketQuote) => (
-    <div
-      key={asset.symbol}
-      className="card hover:shadow-lg transition-shadow cursor-pointer"
-      onClick={() => openTradeModal(asset.symbol)}
-    >
-      <div className="flex justify-between items-start mb-2">
-        <div>
-          <h3 className="text-xl font-bold">{asset.symbol}</h3>
-          <span className="badge badge-info text-xs">{asset.assetType}</span>
-        </div>
-        <div className="text-right">
-          <div className="text-2xl font-bold">${asset.currentPrice.toFixed(2)}</div>
-        </div>
-      </div>
-      <div className="flex justify-between items-center mt-4">
-        <span className="text-sm text-gray-600 dark:text-gray-400">24h Change</span>
-        <span
-          className={`font-semibold ${
-            asset.change24h >= 0 ? 'text-success' : 'text-danger'
-          }`}
+  const renderAssetCard = (asset: MarketQuote) => {
+    const isInWatchlist = watchlistStatus.get(asset.symbol) || false;
+
+    return (
+      <div
+        key={asset.symbol}
+        className="card hover:shadow-lg transition-shadow cursor-pointer relative"
+        onClick={() => openTradeModal(asset.symbol)}
+      >
+        {/* Watchlist Button */}
+        <button
+          onClick={(e) => toggleWatchlist(asset.symbol, asset.assetType as 'STOCK' | 'CRYPTO', e)}
+          className="absolute top-4 right-4 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+          title={isInWatchlist ? 'Remove from watchlist' : 'Add to watchlist'}
         >
-          {asset.change24h >= 0 ? '+' : ''}
-          {asset.change24h.toFixed(2)} ({asset.changePercentage.toFixed(2)}%)
-        </span>
-      </div>
-      {asset.volume && (
-        <div className="flex justify-between items-center mt-2 text-sm">
-          <span className="text-gray-600 dark:text-gray-400">Volume</span>
-          <span>{asset.volume.toLocaleString()}</span>
+          {isInWatchlist ? (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-6 w-6 text-yellow-500"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+            </svg>
+          ) : (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-6 w-6 text-gray-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+              />
+            </svg>
+          )}
+        </button>
+
+        <div className="flex justify-between items-start mb-2 pr-10">
+          <div>
+            <h3 className="text-xl font-bold">{asset.symbol}</h3>
+            <span className="badge badge-info text-xs">{asset.assetType}</span>
+          </div>
+          <div className="text-right">
+            <div className="text-2xl font-bold">${asset.currentPrice.toFixed(2)}</div>
+          </div>
         </div>
-      )}
-    </div>
-  );
+        <div className="flex justify-between items-center mt-4">
+          <span className="text-sm text-gray-600 dark:text-gray-400">24h Change</span>
+          <span
+            className={`font-semibold ${
+              asset.change24h >= 0 ? 'text-success' : 'text-danger'
+            }`}
+          >
+            {asset.change24h >= 0 ? '+' : ''}
+            {asset.change24h.toFixed(2)} ({asset.changePercentage.toFixed(2)}%)
+          </span>
+        </div>
+        {asset.volume && (
+          <div className="flex justify-between items-center mt-2 text-sm">
+            <span className="text-gray-600 dark:text-gray-400">Volume</span>
+            <span>{asset.volume.toLocaleString()}</span>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
