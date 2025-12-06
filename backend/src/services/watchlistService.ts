@@ -108,8 +108,8 @@ export class WatchlistService {
     });
   }
   /**
-  * Remove a symbol from user's watchlist by symbol (more efficient than by ID)
-  */
+   * Remove a symbol from user's watchlist by symbol (more efficient than by ID)
+   */
   async removeFromWatchlistBySymbol(userId: string, symbol: string) {
     return await prisma.watchlist.delete({
       where: {
