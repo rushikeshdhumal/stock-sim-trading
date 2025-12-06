@@ -8,17 +8,6 @@ export default function Watchlist() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchWatchlist = async () => {
-    try {
-      const data = await watchlistService.getWatchlist();
-      setWatchlist(data);
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to load watchlist');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     let mounted = true;
 
