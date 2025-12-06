@@ -130,3 +130,26 @@ export async function removeFromWatchlistBySymbol(userId: string, symbol: string
     },
   });
 }
+
+/**
+ * Check watchlist status for multiple symbols in a single query (batch operation)
+ */
+export async function checkBatchWatchlistStatus(
+  userId: string,
+  symbols: string[]
+): Promise<Map<string, boolean>> {
+  const items = await prisma.watchlist.findMany({
+    where: {
+      userId,
+      symbol: { in: symbols.map((s) => s.toUpperCase()) },
+    },
+    select: { symbol: true },
+  });
+
+  const statusMap = new Map<string, boolean>();
+  const foundSymbols = new Set(items.map((i) => i.symbol));
+  symbols.forEach((symbol) => {
+    statusMap.set(symbol, foundSymbols.has(symbol.toUpperCase()));
+  });
+  return statusMap;
+}

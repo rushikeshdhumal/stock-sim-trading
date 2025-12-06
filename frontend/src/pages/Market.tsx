@@ -69,17 +69,18 @@ export default function Market() {
       ];
       const uniqueSymbols = [...new Set(allSymbols)];
 
+      if (uniqueSymbols.length === 0) {
+        return;
+      }
+
+      // Use batch endpoint for better performance (1 request instead of N)
+      const statusObject = await watchlistService.checkBatchWatchlistStatus(uniqueSymbols);
+
       const statusMap = new Map<string, boolean>();
-      await Promise.all(
-        uniqueSymbols.map(async (symbol) => {
-          try {
-            const inWatchlist = await watchlistService.checkWatchlistStatus(symbol);
-            statusMap.set(symbol, inWatchlist);
-          } catch (error) {
-            statusMap.set(symbol, false);
-          }
-        })
-      );
+      Object.entries(statusObject).forEach(([symbol, inWatchlist]) => {
+        statusMap.set(symbol, inWatchlist);
+      });
+
       setWatchlistStatus(statusMap);
     } catch (error) {
       console.error('Failed to load watchlist status:', error);

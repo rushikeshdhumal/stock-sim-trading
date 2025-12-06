@@ -174,6 +174,12 @@ export const checkWatchlistStatusSchema = z.object({
   }),
 });
 
+export const checkBatchWatchlistStatusSchema = z.object({
+  body: z.object({
+    symbols: z.array(z.string().min(1).max(20)).min(1, 'At least one symbol required').max(100, 'Maximum 100 symbols allowed'),
+  }),
+});
+
 export interface WatchlistItem {
   id: string;
   symbol: string;

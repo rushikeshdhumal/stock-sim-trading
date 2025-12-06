@@ -6,6 +6,7 @@ import {
   addToWatchlistSchema,
   removeFromWatchlistSchema,
   checkWatchlistStatusSchema,
+  checkBatchWatchlistStatusSchema,
 } from '../types';
 
 const router = Router();
@@ -18,6 +19,13 @@ router.get('/', watchlistController.getWatchlist);
 
 // POST /api/watchlist - Add symbol to watchlist
 router.post('/', validate(addToWatchlistSchema), watchlistController.addToWatchlist);
+
+// POST /api/watchlist/check-batch - Check watchlist status for multiple symbols (batch operation)
+router.post(
+  '/check-batch',
+  validate(checkBatchWatchlistStatusSchema),
+  watchlistController.checkBatchWatchlistStatus
+);
 
 // GET /api/watchlist/check/:symbol - Check if symbol is in watchlist (specific route before generic)
 router.get(
