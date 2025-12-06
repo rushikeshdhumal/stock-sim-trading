@@ -318,7 +318,7 @@ export class MarketDataService {
    * Priority: Alpha Vantage -> Finnhub parallel -> yfinance batch
    */
   private async fetchQuoteBatchFromAPI(symbols: string[]): Promise<Map<string, MarketQuote>> {
-    let quotes: Map<string, MarketQuote>;
+    let quotes = new Map<string, MarketQuote>();
 
     // Try Alpha Vantage batch API first (Primary)
     if (env.ALPHA_VANTAGE_API_KEY && symbols.length > 0) {
