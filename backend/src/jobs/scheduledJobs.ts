@@ -56,7 +56,11 @@ export const initializeScheduledJobs = () => {
     // Map weekday string to JS day index (0=Sunday, 1=Monday, ..., 6=Saturday)
     const weekdayStr = parts.find(p => p.type === 'weekday')?.value || '';
     const weekdayMap: { [key: string]: number } = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-    const dayOfWeek = weekdayMap[weekdayStr];
+    const dayOfWeek = weekdayMap[weekdayStr] ?? -1;
+    if (dayOfWeek === -1) {
+      logger.warn(`Unexpected weekday format: ${weekdayStr}`);
+      return;
+    }
 
     // Only run during market hours (9 AM - 4 PM EST/EDT, Mon-Fri)
     const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
