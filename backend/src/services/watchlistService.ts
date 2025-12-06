@@ -141,4 +141,13 @@ export class WatchlistService {
     return statusMap;
   }
 }
-export default new WatchlistService();
+const watchlistService = new WatchlistService();
+export default watchlistService;
+// Named exports for backward compatibility
+export const getUserWatchlist = watchlistService.getUserWatchlist.bind(watchlistService);
+export const addToWatchlist = watchlistService.addToWatchlist.bind(watchlistService);
+export const removeFromWatchlist = watchlistService.removeFromWatchlist.bind(watchlistService);
+export const isInWatchlist = watchlistService.isInWatchlist.bind(watchlistService);
+export const getWatchlistItemBySymbol = watchlistService.getWatchlistItemBySymbol.bind(watchlistService);
+export const removeFromWatchlistBySymbol = watchlistService.removeFromWatchlistBySymbol.bind(watchlistService);
+export const checkBatchWatchlistStatus = watchlistService.checkBatchWatchlistStatus.bind(watchlistService);
