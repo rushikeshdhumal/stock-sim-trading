@@ -44,9 +44,19 @@ export const initializeScheduledJobs = () => {
   cron.schedule('0 */2 * * *', async () => {
     // Get current time in EST/EDT (America/New_York timezone)
     const now = new Date();
-    const estTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-    const hour = estTime.getHours();
-    const dayOfWeek = estTime.getDay();
+    // Use Intl.DateTimeFormat to reliably extract hour and day in America/New_York timezone
+    const estFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      hour: 'numeric',
+      hour12: false,
+      weekday: 'short'
+    });
+    const parts = estFormatter.formatToParts(now);
+    const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
+    // Map weekday string to JS day index (0=Sunday, 1=Monday, ..., 6=Saturday)
+    const weekdayStr = parts.find(p => p.type === 'weekday')?.value || '';
+    const weekdayMap: { [key: string]: number } = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    const dayOfWeek = weekdayMap[weekdayStr];
 
     // Only run during market hours (9 AM - 4 PM EST/EDT, Mon-Fri)
     const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
