@@ -84,3 +84,14 @@ docker-compose down
   - The error occurs even with correct permissions due to Prisma caching issues
   - `db push` syncs schema directly without needing a shadow database
   - For production, use `npx prisma migrate deploy` which also skips shadow database
+
+**Port already in use (EADDRINUSE):**
+- If the backend fails to start with "address already in use :::3001":
+  ```bash
+  # Find the process using port 3001
+  netstat -ano | findstr :3001
+
+  # Kill the process (replace <PID> with the actual process ID from above)
+  taskkill /F /PID <PID>
+  ```
+  - Then restart the dev server with `npm run dev`
