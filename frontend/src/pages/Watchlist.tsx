@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import watchlistService, { WatchlistItem } from '../services/watchlistService';
+import watchlistService, { type WatchlistItem } from '../services/watchlistService';
 import Navigation from '../components/Navigation';
 import { toast } from 'react-hot-toast';
 
