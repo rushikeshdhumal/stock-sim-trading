@@ -453,55 +453,28 @@ export class MarketDataService {
 
   /**
    * Fetch batch quotes from Alpha Vantage
-   * Uses BATCH_STOCK_QUOTES endpoint (up to 100 symbols)
    */
   private async fetchBatchFromAlphaVantage(symbols: string[]): Promise<Map<string, MarketQuote>> {
     const quotes = new Map<string, MarketQuote>();
     const failedSymbols: string[] = [];
-    const missingDataSymbols: string[] = [];
 
     // Alpha Vantage free API only supports individual GLOBAL_QUOTE requests.
     // With rate limiting (5 req/min), large batches will be very slow.
-    // Consider falling back to other providers for batches > 10 symbols.
-    const symbolsToFetch = symbols.slice(0, 10); // Limit for practical performance
-    for (const symbol of symbolsToFetch) {
-      try {
-        const url = `https://www.alphavantage.co/query`;
-        const response = await axios.get(url, {
-          params: {
-            function: 'GLOBAL_QUOTE',
-            symbol: symbol.toUpperCase(),
-            apikey: env.ALPHA_VANTAGE_API_KEY,
-          },
-          timeout: 10000,
-        });
-        const quoteData = response.data['Global Quote'];
-        if (!quoteData || !quoteData['01. symbol'] || !quoteData['05. price']) {
-          missingDataSymbols.push(symbol);
-          continue; // skip if data is missing
-        }
-        quotes.set(symbol.toUpperCase(), {
-          symbol: quoteData['01. symbol'],
-          assetType: 'STOCK',
-          currentPrice: parseFloat(quoteData['05. price']),
-          change24h: parseFloat(quoteData['09. change']) || 0,
-          changePercentage: parseFloat(quoteData['10. change percent']?.replace('%', '') || '0') || 0,
-          volume: parseInt(quoteData['06. volume']) || undefined,
-          lastUpdated: new Date(),
-        });
-      } catch (err: any) {
-        failedSymbols.push(symbol);
-        logger.warn(`Alpha Vantage GLOBAL_QUOTE failed for symbol ${symbol}: ${err.message || err}`);
-        continue;
-      }
-    }
+    // Use alphaVantageQueue to respect rate limits (12 sec between requests)
+    const promises = symbols.map((symbol) =>
+      alphaVantageQueue.add(() => this.fetchFromAlphaVantage(symbol))
+        .then((quote) => quotes.set(symbol, quote))
+        .catch((error) => {
+          failedSymbols.push(symbol);
+          logger.warn(`Alpha Vantage failed for ${symbol}:`, error.message);
+        })
+    );
+
+    await Promise.all(promises);
 
     // Log summary of batch results
     if (failedSymbols.length > 0) {
-      logger.warn(`Alpha Vantage batch: ${failedSymbols.length} symbols failed with errors: ${failedSymbols.join(', ')}`);
-    }
-    if (missingDataSymbols.length > 0) {
-      logger.warn(`Alpha Vantage batch: ${missingDataSymbols.length} symbols returned no data (possibly invalid): ${missingDataSymbols.join(', ')}`);
+      logger.warn(`Alpha Vantage batch: ${failedSymbols.length}/${symbols.length} symbols failed: ${failedSymbols.join(', ')}`);
     }
 
     return quotes;
