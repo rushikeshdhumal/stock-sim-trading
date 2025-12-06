@@ -11,9 +11,10 @@ const prisma = getPrismaClient();
 const CACHE_TTL = parseInt(env.MARKET_DATA_CACHE_TTL);
 
 // API Response Type Definitions
+// Note: yfinance API always returns symbol, but assetType may be missing (defaults to 'STOCK')
 interface YFinanceBatchQuote {
-  symbol?: string;
-  assetType?: string;
+  symbol: string;
+  assetType?: string; // Optional: defaults to 'STOCK' if not provided
   currentPrice: number;
   change24h: number;
   changePercentage: number;
@@ -548,7 +549,7 @@ export class MarketDataService {
         const successCount = Object.keys(response.data).length;
         for (const [symbol, quoteData] of Object.entries(response.data)) {
           quotes.set(symbol, {
-            symbol: quoteData.symbol || symbol,
+            symbol: quoteData.symbol,
             assetType: quoteData.assetType || 'STOCK',
             currentPrice: quoteData.currentPrice,
             change24h: quoteData.change24h,
