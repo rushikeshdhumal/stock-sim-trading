@@ -42,21 +42,26 @@ export const initializeScheduledJobs = () => {
 
   // Calculate leaderboards every 2 hours (reduced frequency to minimize API calls)
   cron.schedule('0 */2 * * *', async () => {
+    // Get current time in EST/EDT (America/New_York timezone)
     const now = new Date();
-    const hour = now.getHours();
+    const estTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    const hour = estTime.getHours();
+    const dayOfWeek = estTime.getDay();
 
-    // Only run during market hours (9 AM - 4 PM EST, Mon-Fri)
-    const isWeekday = now.getDay() >= 1 && now.getDay() <= 5;
+    // Only run during market hours (9 AM - 4 PM EST/EDT, Mon-Fri)
+    const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
     const isMarketHours = hour >= 9 && hour <= 16;
 
     if (isWeekday && isMarketHours) {
-      logger.info('Running scheduled leaderboard update...');
+      logger.info(`Running scheduled leaderboard update (EST time: ${estTime.toLocaleTimeString('en-US', { timeZone: 'America/New_York' })})...`);
       try {
         await leaderboardService.calculateLeaderboards();
         logger.info('Scheduled leaderboard update completed');
       } catch (error) {
         logger.error('Scheduled leaderboard update failed:', error);
       }
+    } else {
+      logger.debug(`Skipping leaderboard update - outside market hours (EST time: ${estTime.toLocaleTimeString('en-US', { timeZone: 'America/New_York' })}, ${isWeekday ? 'weekday' : 'weekend'})`);
     }
   });
 
