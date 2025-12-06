@@ -23,15 +23,7 @@ export default function Market() {
   useEffect(() => {
     loadMarketData();
     loadPortfolioData();
-    loadWatchlistStatus();
   }, []);
-
-  useEffect(() => {
-    // Update watchlist status when trending/popular data changes
-    if (trending.length > 0 || popular.length > 0) {
-      loadWatchlistStatus();
-    }
-  }, [trending, popular]);
 
   const loadMarketData = async () => {
     try {
@@ -41,6 +33,8 @@ export default function Market() {
       ]);
       setTrending(trendingData);
       setPopular(popularData);
+      // Load watchlist status after market data is loaded
+      await loadWatchlistStatus(trendingData, popularData, []);
     } catch (error) {
       console.error('Failed to load market data:', error);
     } finally {
@@ -60,26 +54,31 @@ export default function Market() {
     }
   };
 
-  const loadWatchlistStatus = async () => {
+  const loadWatchlistStatus = async (
+    trendingData: MarketQuote[] = trending,
+    popularData: MarketQuote[] = popular,
+    searchData: any[] = searchResults
+  ) => {
     try {
       const allSymbols = [
-        ...trending.map((a) => a.symbol),
-        ...popular.map((a) => a.symbol),
-        ...searchResults.map((r) => r.symbol),
+        ...trendingData.map((a) => a.symbol),
+        ...popularData.map((a) => a.symbol),
+        ...searchData.map((r) => r.symbol),
       ];
       const uniqueSymbols = [...new Set(allSymbols)];
 
+      if (uniqueSymbols.length === 0) {
+        return;
+      }
+
+      // Use batch endpoint for better performance (1 request instead of N)
+      const statusObject = await watchlistService.checkBatchWatchlistStatus(uniqueSymbols);
+
       const statusMap = new Map<string, boolean>();
-      await Promise.all(
-        uniqueSymbols.map(async (symbol) => {
-          try {
-            const inWatchlist = await watchlistService.checkWatchlistStatus(symbol);
-            statusMap.set(symbol, inWatchlist);
-          } catch (error) {
-            statusMap.set(symbol, false);
-          }
-        })
-      );
+      Object.entries(statusObject).forEach(([symbol, inWatchlist]) => {
+        statusMap.set(symbol, inWatchlist);
+      });
+
       setWatchlistStatus(statusMap);
     } catch (error) {
       console.error('Failed to load watchlist status:', error);
@@ -97,13 +96,8 @@ export default function Market() {
 
     try {
       if (isInWatchlist) {
-        // Find the watchlist item and remove it
-        const watchlist = await watchlistService.getWatchlist();
-        const item = watchlist.find((w) => w.symbol === symbol);
-        if (item) {
-          await watchlistService.removeFromWatchlist(item.id);
-          toast.success(`${symbol} removed from watchlist`);
-        }
+        await watchlistService.removeFromWatchlistBySymbol(symbol);
+        toast.success(`${symbol} removed from watchlist`);
       } else {
         await watchlistService.addToWatchlist(symbol, assetType);
         toast.success(`${symbol} added to watchlist`);
@@ -136,6 +130,8 @@ export default function Market() {
     try {
       const results = await marketService.search(searchQuery);
       setSearchResults(results);
+      // Update watchlist status to include search results
+      await loadWatchlistStatus(trending, popular, results);
     } catch (error) {
       toast.error('Search failed');
     } finally {
@@ -166,6 +162,8 @@ export default function Market() {
           onClick={(e) => toggleWatchlist(asset.symbol, asset.assetType as 'STOCK' | 'CRYPTO', e)}
           className="absolute top-4 right-4 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
           title={isInWatchlist ? 'Remove from watchlist' : 'Add to watchlist'}
+          aria-label={isInWatchlist ? `Remove ${asset.symbol} from watchlist` : `Add ${asset.symbol} to watchlist`}
+          aria-pressed={isInWatchlist}
         >
           {isInWatchlist ? (
             <svg

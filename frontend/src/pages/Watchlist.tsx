@@ -8,26 +8,37 @@ export default function Watchlist() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchWatchlist = async () => {
-    try {
-      const data = await watchlistService.getWatchlist();
-      setWatchlist(data);
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to load watchlist');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    let mounted = true;
+
+    const fetchWatchlist = async () => {
+      if (!mounted) return;
+
+      try {
+        const data = await watchlistService.getWatchlist();
+        if (mounted) {
+          setWatchlist(data);
+        }
+      } catch (error: any) {
+        if (mounted) {
+          toast.error(error.response?.data?.error || 'Failed to load watchlist');
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
     fetchWatchlist();
 
     // Auto-refresh every 30 seconds
-    const interval = setInterval(() => {
-      fetchWatchlist();
-    }, 30000);
+    const interval = setInterval(fetchWatchlist, 30000);
 
-    return () => clearInterval(interval);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   const handleRemove = async (id: string, symbol: string) => {
@@ -101,6 +112,7 @@ export default function Watchlist() {
                 onClick={() => handleRemove(item.id, item.symbol)}
                 className="text-gray-400 hover:text-red-600 transition-colors duration-200"
                 title="Remove from watchlist"
+                aria-label={`Remove ${item.symbol} from watchlist`}
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"

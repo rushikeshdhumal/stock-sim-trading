@@ -56,8 +56,33 @@ export const removeFromWatchlist = async (req: Request, res: Response) => {
       success: true,
       message: 'Removed from watchlist',
     });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.code === 'P2025') {
+      res.status(404).json({ error: 'Watchlist item not found' });
+      return;
+    }
     logger.error('Error removing from watchlist:', error);
+    res.status(500).json({ error: 'Failed to remove from watchlist' });
+  }
+};
+
+export const removeFromWatchlistBySymbol = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const { symbol } = req.params;
+
+    await watchlistService.removeFromWatchlistBySymbol(userId, symbol);
+
+    res.json({
+      success: true,
+      message: 'Removed from watchlist',
+    });
+  } catch (error: any) {
+    if (error.code === 'P2025') {
+      res.status(404).json({ error: 'Watchlist item not found' });
+      return;
+    }
+    logger.error('Error removing from watchlist by symbol:', error);
     res.status(500).json({ error: 'Failed to remove from watchlist' });
   }
 };
@@ -79,9 +104,33 @@ export const checkWatchlistStatus = async (req: Request, res: Response) => {
   }
 };
 
+export const checkBatchWatchlistStatus = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const { symbols } = req.body;
+    const statusMap = await watchlistService.checkBatchWatchlistStatus(userId, symbols);
+
+    // Convert Map to object for JSON response
+    const statusObject: Record<string, boolean> = {};
+    statusMap.forEach((value, key) => {
+      statusObject[key] = value;
+    });
+
+    res.json({
+      success: true,
+      data: statusObject,
+    });
+  } catch (error) {
+    logger.error('Error checking batch watchlist status:', error);
+    res.status(500).json({ error: 'Failed to check watchlist status' });
+  }
+};
+
 export default {
   getWatchlist,
   addToWatchlist,
   removeFromWatchlist,
+  removeFromWatchlistBySymbol,
   checkWatchlistStatus,
+  checkBatchWatchlistStatus,
 };

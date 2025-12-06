@@ -6,113 +6,166 @@ import { WatchlistItem } from '../types';
 
 const prisma = getPrismaClient();
 
-/**
- * Get user's watchlist with current market data
- * Uses batch API for optimal performance
- */
-export async function getUserWatchlist(userId: string): Promise<WatchlistItem[]> {
-  const watchlistItems = await prisma.watchlist.findMany({
-    where: { userId },
-    orderBy: { addedAt: 'desc' },
-  });
-
-  if (watchlistItems.length === 0) {
-    return [];
+export class WatchlistService {
+  /**
+   * Get user's watchlist with current market data
+   * Uses batch API for optimal performance
+   */
+  async getUserWatchlist(userId: string): Promise<WatchlistItem[]> {
+    const watchlistItems = await prisma.watchlist.findMany({
+      where: { userId },
+      orderBy: { addedAt: 'desc' },
+    });
+    if (watchlistItems.length === 0) {
+      return [];
+    }
+    // Extract symbols for batch fetching
+    const symbols = watchlistItems.map((item) => item.symbol);
+    // Use batch API to fetch all quotes at once (much faster!)
+    const quotesMap = await marketDataService.getQuoteBatch(symbols);
+    // Enrich watchlist items with current market data
+    const enrichedItems: WatchlistItem[] = watchlistItems.map((item) => {
+      const quote = quotesMap.get(item.symbol);
+      if (quote) {
+        return {
+          id: item.id,
+          symbol: item.symbol,
+          assetType: item.assetType,
+          notes: item.notes || undefined,
+          addedAt: item.addedAt,
+          currentPrice: quote.currentPrice,
+          change24h: quote.change24h,
+          changePercentage: quote.changePercentage,
+        };
+      } else {
+        // Return without price data if quote fetch failed
+        logger.warn(`Failed to get quote for ${item.symbol} in watchlist`);
+        return {
+          id: item.id,
+          symbol: item.symbol,
+          assetType: item.assetType,
+          notes: item.notes || undefined,
+          addedAt: item.addedAt,
+        };
+      }
+    });
+    return enrichedItems;
+  }
+  /**
+   * Add a symbol to user's watchlist
+   */
+  async addToWatchlist(
+    userId: string,
+    symbol: string,
+    assetType: AssetType,
+    notes?: string
+  ) {
+    return await prisma.watchlist.create({
+      data: {
+        userId,
+        symbol: symbol.toUpperCase(),
+        assetType,
+        notes: notes || null,
+      },
+    });
+  }
+  /**
+   * Remove a symbol from user's watchlist
+   */
+  async removeFromWatchlist(userId: string, watchlistId: string) {
+    return await prisma.watchlist.delete({
+      where: {
+        id: watchlistId,
+        userId, // Ensure user owns this watchlist item
+      },
+    });
+  }
+  /**
+   * Check if a symbol is in user's watchlist
+   */
+  async isInWatchlist(userId: string, symbol: string): Promise<boolean> {
+    const item = await prisma.watchlist.findUnique({
+      where: {
+        userId_symbol: {
+          userId,
+          symbol: symbol.toUpperCase(),
+        },
+      },
+    });
+    return !!item;
+  }
+  /**
+   * Get watchlist item by symbol (for removal by symbol instead of ID)
+   */
+  async getWatchlistItemBySymbol(userId: string, symbol: string) {
+    return await prisma.watchlist.findUnique({
+      where: {
+        userId_symbol: {
+          userId,
+          symbol: symbol.toUpperCase(),
+        },
+      },
+    });
+  }
+  /**
+   * Remove a symbol from user's watchlist by symbol (more efficient than by ID)
+   */
+  async removeFromWatchlistBySymbol(userId: string, symbol: string) {
+    return await prisma.watchlist.delete({
+      where: {
+        userId_symbol: {
+          userId,
+          symbol: symbol.toUpperCase(),
+        },
+      },
+    });
   }
 
-  // Extract symbols for batch fetching
-  const symbols = watchlistItems.map((item) => item.symbol);
+  /**
+   * Check watchlist status for multiple symbols in a single query (batch operation)
+   */
+  async checkBatchWatchlistStatus(userId: string, symbols: string[]): Promise<Map<string, boolean>> {
+    // 1. Validate and sanitize input
+    // Dedup, filter empty/whitespace, standardize to uppercase, and limit to 100 items
+    const validSymbols = [...new Set(symbols)]
+      .filter((s) => s && s.trim().length > 0)
+      .map((s) => s.trim().toUpperCase())
+      .slice(0, 100);
 
-  // Use batch API to fetch all quotes at once (much faster!)
-  const quotesMap = await marketDataService.getQuoteBatch(symbols);
-
-  // Enrich watchlist items with current market data
-  const enrichedItems: WatchlistItem[] = watchlistItems.map((item) => {
-    const quote = quotesMap.get(item.symbol);
-
-    if (quote) {
-      return {
-        id: item.id,
-        symbol: item.symbol,
-        assetType: item.assetType,
-        notes: item.notes || undefined,
-        addedAt: item.addedAt,
-        currentPrice: quote.currentPrice,
-        change24h: quote.change24h,
-        changePercentage: quote.changePercentage,
-      };
-    } else {
-      // Return without price data if quote fetch failed
-      logger.warn(`Failed to get quote for ${item.symbol} in watchlist`);
-      return {
-        id: item.id,
-        symbol: item.symbol,
-        assetType: item.assetType,
-        notes: item.notes || undefined,
-        addedAt: item.addedAt,
-      };
+    // 2. Early exit to prevent unnecessary DB calls
+    if (validSymbols.length === 0) {
+      return new Map();
     }
-  });
 
-  return enrichedItems;
-}
-
-/**
- * Add a symbol to user's watchlist
- */
-export async function addToWatchlist(
-  userId: string,
-  symbol: string,
-  assetType: AssetType,
-  notes?: string
-) {
-  return await prisma.watchlist.create({
-    data: {
-      userId,
-      symbol: symbol.toUpperCase(),
-      assetType,
-      notes: notes || null,
-    },
-  });
-}
-
-/**
- * Remove a symbol from user's watchlist
- */
-export async function removeFromWatchlist(userId: string, watchlistId: string) {
-  return await prisma.watchlist.delete({
-    where: {
-      id: watchlistId,
-      userId, // Ensure user owns this watchlist item
-    },
-  });
-}
-
-/**
- * Check if a symbol is in user's watchlist
- */
-export async function isInWatchlist(userId: string, symbol: string): Promise<boolean> {
-  const item = await prisma.watchlist.findUnique({
-    where: {
-      userId_symbol: {
+    // 3. Database Query
+    const items = await prisma.watchlist.findMany({
+      where: {
         userId,
-        symbol: symbol.toUpperCase(),
+        symbol: { in: validSymbols },
       },
-    },
-  });
-  return !!item;
-}
+      select: { symbol: true },
+    });
 
-/**
- * Get watchlist item by symbol (for removal by symbol instead of ID)
- */
-export async function getWatchlistItemBySymbol(userId: string, symbol: string) {
-  return await prisma.watchlist.findUnique({
-    where: {
-      userId_symbol: {
-        userId,
-        symbol: symbol.toUpperCase(),
-      },
-    },
-  });
+    // 4. Construct Response
+    const statusMap = new Map<string, boolean>();
+    const foundSymbols = new Set(items.map((i) => i.symbol));
+
+    // Iterate over validSymbols to ensure the returned map keys 
+    // correspond to the standardized symbols we actually queried.
+    validSymbols.forEach((symbol) => {
+      statusMap.set(symbol, foundSymbols.has(symbol));
+    });
+
+    return statusMap;
+  }
 }
+const watchlistService = new WatchlistService();
+export default watchlistService;
+// Named exports for backward compatibility
+export const getUserWatchlist = watchlistService.getUserWatchlist.bind(watchlistService);
+export const addToWatchlist = watchlistService.addToWatchlist.bind(watchlistService);
+export const removeFromWatchlist = watchlistService.removeFromWatchlist.bind(watchlistService);
+export const isInWatchlist = watchlistService.isInWatchlist.bind(watchlistService);
+export const getWatchlistItemBySymbol = watchlistService.getWatchlistItemBySymbol.bind(watchlistService);
+export const removeFromWatchlistBySymbol = watchlistService.removeFromWatchlistBySymbol.bind(watchlistService);
+export const checkBatchWatchlistStatus = watchlistService.checkBatchWatchlistStatus.bind(watchlistService);
