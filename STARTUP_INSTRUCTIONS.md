@@ -35,11 +35,12 @@ Edit `backend/.env` and add your API keys:
 - `FINNHUB_API_KEY` (optional)
 - Other keys use defaults from .env.example
 
-### 4. Run Database Migrations
+### 4. Setup Database Schema
 ```bash
 cd backend
-npx prisma migrate dev
+npx prisma db push
 ```
+**Note:** If `npx prisma migrate dev` fails with shadow database errors, use `npx prisma db push` instead. This syncs the schema directly without requiring a shadow database.
 
 ### 5. Start Development Servers
 ```bash
@@ -75,5 +76,11 @@ docker-compose down
 - Verify containers are running: `docker-compose ps`
 
 **API rate limits:**
-- App works without API keys (uses mock data)
 - Add API keys in `backend/.env` for real market data
+
+**Prisma migration errors (P3014/P1003):**
+- If `npx prisma migrate dev` fails with shadow database permission errors:
+  - Use `npx prisma db push` instead (development workaround)
+  - The error occurs even with correct permissions due to Prisma caching issues
+  - `db push` syncs schema directly without needing a shadow database
+  - For production, use `npx prisma migrate deploy` which also skips shadow database
