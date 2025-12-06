@@ -104,12 +104,6 @@ export const checkBatchWatchlistStatus = async (req: Request, res: Response) => 
   try {
     const userId = req.user!.userId;
     const { symbols } = req.body;
-
-    if (!Array.isArray(symbols) || symbols.length === 0) {
-      res.status(400).json({ error: 'symbols must be a non-empty array' });
-      return;
-    }
-
     const statusMap = await watchlistService.checkBatchWatchlistStatus(userId, symbols);
 
     // Convert Map to object for JSON response
