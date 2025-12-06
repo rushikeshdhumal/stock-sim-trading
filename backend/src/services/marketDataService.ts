@@ -72,12 +72,27 @@ export class MarketDataService {
       return new Map();
     }
 
+    // Input validation: Remove duplicates, empty strings, and limit batch size
+    const validSymbols = [...new Set(symbols)]
+      .filter(s => s && s.trim().length > 0)
+      .map(s => s.trim().toUpperCase())
+      .slice(0, 100); // Limit to 100 symbols per batch
+
+    if (validSymbols.length === 0) {
+      logger.warn('getQuoteBatch called with no valid symbols');
+      return new Map();
+    }
+
+    if (validSymbols.length < symbols.length) {
+      logger.warn(`getQuoteBatch: Filtered ${symbols.length - validSymbols.length} invalid/duplicate symbols`);
+    }
+
     const results = new Map<string, MarketQuote>();
     const uncachedSymbols: string[] = [];
     const symbolsToCheckDb: string[] = [];
 
     // Step 1: Check Redis cache for all symbols
-    for (const symbol of symbols) {
+    for (const symbol of validSymbols) {
       const cacheKey = `quote:${symbol}`;
 
       try {
