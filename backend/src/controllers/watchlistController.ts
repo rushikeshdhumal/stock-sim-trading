@@ -78,12 +78,12 @@ export const removeFromWatchlistBySymbol = async (req: Request, res: Response) =
       message: 'Removed from watchlist',
     });
   } catch (error: any) {
-  if (error.code === 'P2025') {
-    res.status(404).json({ error: 'Watchlist item not found' });
-    return;
-  }
-  logger.error('Error removing from watchlist by symbol:', error);
-  res.status(500).json({ error: 'Failed to remove from watchlist' });
+    if (error.code === 'P2025') {
+      res.status(404).json({ error: 'Watchlist item not found' });
+      return;
+    }
+    logger.error('Error removing from watchlist by symbol:', error);
+    res.status(500).json({ error: 'Failed to remove from watchlist' });
   }
 };
 
