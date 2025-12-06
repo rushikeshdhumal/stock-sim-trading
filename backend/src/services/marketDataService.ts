@@ -74,36 +74,58 @@ export class MarketDataService {
 
     const results = new Map<string, MarketQuote>();
     const uncachedSymbols: string[] = [];
+    const symbolsToCheckDb: string[] = [];
 
-    // Check cache for each symbol
+    // Step 1: Check Redis cache for all symbols
     for (const symbol of symbols) {
       const cacheKey = `quote:${symbol}`;
 
       try {
-        // Try Redis cache first
         const cached = await cacheGet(cacheKey);
         if (cached) {
           results.set(symbol, JSON.parse(cached));
-          continue;
+        } else {
+          // Not in Redis, need to check database
+          symbolsToCheckDb.push(symbol);
         }
+      } catch (error) {
+        logger.warn(`Redis cache error for ${symbol}:`, error);
+        symbolsToCheckDb.push(symbol);
+      }
+    }
 
-        // Try database cache
-        const dbCache = await prisma.marketDataCache.findUnique({
-          where: { symbol },
+    // Step 2: Batch query database for symbols not in Redis
+    if (symbolsToCheckDb.length > 0) {
+      try {
+        // Single batch query instead of N individual queries
+        const dbCaches = await prisma.marketDataCache.findMany({
+          where: {
+            symbol: {
+              in: symbolsToCheckDb,
+            },
+          },
         });
 
-        if (dbCache && this.isCacheValid(dbCache.lastUpdated)) {
-          const quote = this.formatQuote(dbCache);
-          results.set(symbol, quote);
-          await this.setCacheQuote(cacheKey, quote);
-          continue;
-        }
+        // Process database results
+        const dbCacheMap = new Map(dbCaches.map(cache => [cache.symbol, cache]));
 
-        // Symbol not in cache, needs API fetch
-        uncachedSymbols.push(symbol);
+        for (const symbol of symbolsToCheckDb) {
+          const dbCache = dbCacheMap.get(symbol);
+
+          if (dbCache && this.isCacheValid(dbCache.lastUpdated)) {
+            const quote = this.formatQuote(dbCache);
+            results.set(symbol, quote);
+            // Backfill Redis cache
+            await this.setCacheQuote(`quote:${symbol}`, quote);
+          } else {
+            // Symbol not in cache or cache expired, needs API fetch
+            uncachedSymbols.push(symbol);
+          }
+        }
       } catch (error) {
-        logger.warn(`Cache error for ${symbol}:`, error);
-        uncachedSymbols.push(symbol);
+        logger.error('Database batch query failed:', error);
+        // On error, treat all symbolsToCheckDb as uncached
+        uncachedSymbols.push(...symbolsToCheckDb);
       }
     }
 
