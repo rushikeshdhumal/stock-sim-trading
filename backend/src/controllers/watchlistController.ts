@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import * as watchlistService from '../services/watchlistService';
+import watchlistService from '../services/watchlistService';
 import logger from '../config/logger';
 import { AssetType } from '@prisma/client';
 
