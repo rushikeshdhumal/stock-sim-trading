@@ -23,15 +23,7 @@ export default function Market() {
   useEffect(() => {
     loadMarketData();
     loadPortfolioData();
-    loadWatchlistStatus();
   }, []);
-
-  useEffect(() => {
-    // Update watchlist status when trending/popular data changes
-    if (trending.length > 0 || popular.length > 0) {
-      loadWatchlistStatus();
-    }
-  }, [trending, popular]);
 
   const loadMarketData = async () => {
     try {
@@ -41,6 +33,8 @@ export default function Market() {
       ]);
       setTrending(trendingData);
       setPopular(popularData);
+      // Load watchlist status after market data is loaded
+      await loadWatchlistStatus(trendingData, popularData, []);
     } catch (error) {
       console.error('Failed to load market data:', error);
     } finally {
@@ -60,12 +54,16 @@ export default function Market() {
     }
   };
 
-  const loadWatchlistStatus = async () => {
+  const loadWatchlistStatus = async (
+    trendingData: MarketQuote[] = trending,
+    popularData: MarketQuote[] = popular,
+    searchData: any[] = searchResults
+  ) => {
     try {
       const allSymbols = [
-        ...trending.map((a) => a.symbol),
-        ...popular.map((a) => a.symbol),
-        ...searchResults.map((r) => r.symbol),
+        ...trendingData.map((a) => a.symbol),
+        ...popularData.map((a) => a.symbol),
+        ...searchData.map((r) => r.symbol),
       ];
       const uniqueSymbols = [...new Set(allSymbols)];
 
@@ -132,6 +130,8 @@ export default function Market() {
     try {
       const results = await marketService.search(searchQuery);
       setSearchResults(results);
+      // Update watchlist status to include search results
+      await loadWatchlistStatus(trending, popular, results);
     } catch (error) {
       toast.error('Search failed');
     } finally {
