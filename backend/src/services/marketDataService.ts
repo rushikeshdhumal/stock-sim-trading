@@ -107,7 +107,12 @@ export class MarketDataService {
     const cacheResults = await Promise.all(cacheCheckPromises);
     for (const { symbol, cached } of cacheResults) {
       if (cached) {
-        results.set(symbol, JSON.parse(cached));
+        try {
+          results.set(symbol, JSON.parse(cached));
+        } catch (parseError) {
+          logger.warn(`Failed to parse cached data for ${symbol}, will refetch:`, parseError);
+          symbolsToCheckDb.push(symbol);
+        }
       } else {
         // Not in Redis, need to check database
         symbolsToCheckDb.push(symbol);
