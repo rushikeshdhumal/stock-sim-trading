@@ -91,20 +91,24 @@ export class MarketDataService {
     const uncachedSymbols: string[] = [];
     const symbolsToCheckDb: string[] = [];
 
-    // Step 1: Check Redis cache for all symbols
-    for (const symbol of validSymbols) {
+    // Step 1: Check Redis cache for all symbols in parallel
+    const cacheCheckPromises = validSymbols.map(async (symbol) => {
       const cacheKey = `quote:${symbol}`;
-
       try {
         const cached = await cacheGet(cacheKey);
-        if (cached) {
-          results.set(symbol, JSON.parse(cached));
-        } else {
-          // Not in Redis, need to check database
-          symbolsToCheckDb.push(symbol);
-        }
+        return { symbol, cached, cacheKey };
       } catch (error) {
         logger.warn(`Redis cache error for ${symbol}:`, error);
+        return { symbol, cached: null, cacheKey };
+      }
+    });
+
+    const cacheResults = await Promise.all(cacheCheckPromises);
+    for (const { symbol, cached } of cacheResults) {
+      if (cached) {
+        results.set(symbol, JSON.parse(cached));
+      } else {
+        // Not in Redis, need to check database
         symbolsToCheckDb.push(symbol);
       }
     }
