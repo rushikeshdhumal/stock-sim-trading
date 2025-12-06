@@ -34,7 +34,12 @@ export class RequestQueue {
         await this.delay(this.delayMs);
       }
     }
-    this.processing = false;
+    // If new items were added during processing, process them now
+    if (this.queue.length > 0) {
+      this.processQueue();
+    } else {
+      this.processing = false;
+    }
   }
 
   private delay(ms: number): Promise<void> {
