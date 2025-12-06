@@ -325,9 +325,10 @@ export class MarketDataService {
     let quotes = new Map<string, MarketQuote>();
 
     // Try Alpha Vantage batch API first (Primary)
+    // Note: fetchBatchFromAlphaVantage already handles rate limiting internally via alphaVantageQueue
     if (env.ALPHA_VANTAGE_API_KEY && symbols.length > 0) {
       try {
-        quotes = await alphaVantageQueue.add(() => this.fetchBatchFromAlphaVantage(symbols));
+        quotes = await this.fetchBatchFromAlphaVantage(symbols);
         if (quotes.size > 0) {
           logger.info(`Alpha Vantage batch: Successfully fetched ${quotes.size}/${symbols.length} symbols`);
           return quotes;
