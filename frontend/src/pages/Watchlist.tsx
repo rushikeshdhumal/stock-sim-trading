@@ -101,6 +101,7 @@ export default function Watchlist() {
                 onClick={() => handleRemove(item.id, item.symbol)}
                 className="text-gray-400 hover:text-red-600 transition-colors duration-200"
                 title="Remove from watchlist"
+                aria-label={`Remove ${item.symbol} from watchlist`}
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
