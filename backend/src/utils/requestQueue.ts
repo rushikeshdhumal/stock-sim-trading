@@ -22,6 +22,8 @@ export class RequestQueue {
     if (this.processing || this.queue.length === 0) return;
 
     this.processing = true;
+    // Continue processing as long as there are items in the queue
+    // This handles items added during processing without recursion
     while (this.queue.length > 0) {
       const item = this.queue.shift()!;
       try {
@@ -34,11 +36,7 @@ export class RequestQueue {
         await this.delay(this.delayMs);
       }
     }
-    // If new items were added during processing, process them now
     this.processing = false;
-    if (this.queue.length > 0) {
-      this.processQueue();
-    }
   }
 
   private delay(ms: number): Promise<void> {
