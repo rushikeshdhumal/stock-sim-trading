@@ -122,22 +122,40 @@ export class WatchlistService {
   }
 
   /**
-  * Check watchlist status for multiple symbols in a single query (batch operation)
-  */
+   * Check watchlist status for multiple symbols in a single query (batch operation)
+   */
   async checkBatchWatchlistStatus(userId: string, symbols: string[]): Promise<Map<string, boolean>> {
+    // 1. Validate and sanitize input
+    // Dedup, filter empty/whitespace, standardize to uppercase, and limit to 100 items
+    const validSymbols = [...new Set(symbols)]
+      .filter((s) => s && s.trim().length > 0)
+      .map((s) => s.trim().toUpperCase())
+      .slice(0, 100);
+
+    // 2. Early exit to prevent unnecessary DB calls
+    if (validSymbols.length === 0) {
+      return new Map();
+    }
+
+    // 3. Database Query
     const items = await prisma.watchlist.findMany({
       where: {
         userId,
-        symbol: { in: symbols.map((s) => s.toUpperCase()) },
+        symbol: { in: validSymbols },
       },
       select: { symbol: true },
     });
 
+    // 4. Construct Response
     const statusMap = new Map<string, boolean>();
     const foundSymbols = new Set(items.map((i) => i.symbol));
-    symbols.forEach((symbol) => {
-      statusMap.set(symbol, foundSymbols.has(symbol.toUpperCase()));
+
+    // Iterate over validSymbols to ensure the returned map keys 
+    // correspond to the standardized symbols we actually queried.
+    validSymbols.forEach((symbol) => {
+      statusMap.set(symbol, foundSymbols.has(symbol));
     });
+
     return statusMap;
   }
 }
