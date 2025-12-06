@@ -78,9 +78,11 @@ Return all 10 quotes
 
 | API | Batch Support | Method | Max Symbols |
 |-----|--------------|--------|-------------|
-| Alpha Vantage | ✅ Native | `BATCH_STOCK_QUOTES` | 100 |
+| Alpha Vantage | ❌ Deprecated | `BATCH_STOCK_QUOTES` (deprecated/unavailable in free tier) | 0 |
 | Finnhub | ✅ Parallel | Multiple requests queued | Unlimited |
 | yfinance | ✅ Native | Batch endpoint (optional) | Unlimited |
+
+> **Note:** Alpha Vantage's batch endpoint (`BATCH_STOCK_QUOTES`) is deprecated and no longer available in the free tier. Batch requests for Alpha Vantage will fall back to sequential or parallel single-symbol requests.
 
 #### Usage Example
 
@@ -421,7 +423,7 @@ npm test -- marketDataService.test.ts
 
 ### Version 2.1.0 (2025-12-04)
 - **NEW**: Batch API request system for multiple symbols
-- **NEW**: Alpha Vantage batch quotes endpoint support
+- **NOTE**: Alpha Vantage batch quotes endpoint (`BATCH_STOCK_QUOTES`) is deprecated and not available in the free tier. Batch support for Alpha Vantage is currently unavailable.
 - **NEW**: Finnhub parallel batch fetching
 - **NEW**: yfinance batch endpoint integration
 - Updated portfolioService to use batch API (90-97% faster)

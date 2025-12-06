@@ -10,6 +10,22 @@ import { alphaVantageQueue, yfinanceQueue, finnhubQueue } from '../utils/request
 const prisma = getPrismaClient();
 const CACHE_TTL = parseInt(env.MARKET_DATA_CACHE_TTL);
 
+// API Response Type Definitions
+// Note: yfinance API always returns symbol, but assetType may be missing (defaults to 'STOCK')
+interface YFinanceBatchQuote {
+  symbol: string;
+  assetType?: string; // Optional: defaults to 'STOCK' if not provided
+  currentPrice: number;
+  change24h: number;
+  changePercentage: number;
+  volume?: number;
+  marketCap?: number;
+}
+
+interface YFinanceBatchResponse {
+  [symbol: string]: YFinanceBatchQuote;
+}
+
 export class MarketDataService {
   /**
    * Get quote for a symbol (with caching)
@@ -57,38 +73,86 @@ export class MarketDataService {
       return new Map();
     }
 
+    // Input validation: Remove duplicates, empty strings, and limit batch size
+    const validSymbols = [...new Set(symbols)]
+      .filter(s => s && s.trim().length > 0)
+      .map(s => s.trim().toUpperCase())
+      .slice(0, 100); // Limit to 100 symbols per batch
+
+    if (validSymbols.length === 0) {
+      logger.warn('getQuoteBatch called with no valid symbols');
+      return new Map();
+    }
+
+    if (validSymbols.length < symbols.length) {
+      logger.warn(`getQuoteBatch: Filtered ${symbols.length - validSymbols.length} invalid/duplicate symbols`);
+    }
+
     const results = new Map<string, MarketQuote>();
     const uncachedSymbols: string[] = [];
+    const symbolsToCheckDb: string[] = [];
 
-    // Check cache for each symbol
-    for (const symbol of symbols) {
+    // Step 1: Check Redis cache for all symbols in parallel
+    const cacheCheckPromises = validSymbols.map(async (symbol) => {
       const cacheKey = `quote:${symbol}`;
-
       try {
-        // Try Redis cache first
         const cached = await cacheGet(cacheKey);
-        if (cached) {
-          results.set(symbol, JSON.parse(cached));
-          continue;
-        }
+        return { symbol, cached, cacheKey };
+      } catch (error) {
+        logger.warn(`Redis cache error for ${symbol}:`, error);
+        return { symbol, cached: null, cacheKey };
+      }
+    });
 
-        // Try database cache
-        const dbCache = await prisma.marketDataCache.findUnique({
-          where: { symbol },
+    const cacheResults = await Promise.all(cacheCheckPromises);
+    for (const { symbol, cached } of cacheResults) {
+      if (cached) {
+        try {
+          results.set(symbol, JSON.parse(cached));
+        } catch (parseError) {
+          logger.warn(`Failed to parse cached data for ${symbol}, will refetch:`, parseError);
+          symbolsToCheckDb.push(symbol);
+        }
+      } else {
+        // Not in Redis, need to check database
+        symbolsToCheckDb.push(symbol);
+      }
+    }
+
+    // Step 2: Batch query database for symbols not in Redis
+    if (symbolsToCheckDb.length > 0) {
+      try {
+        // Single batch query instead of N individual queries
+        const dbCaches = await prisma.marketDataCache.findMany({
+          where: {
+            symbol: {
+              in: symbolsToCheckDb,
+            },
+          },
         });
 
-        if (dbCache && this.isCacheValid(dbCache.lastUpdated)) {
-          const quote = this.formatQuote(dbCache);
-          results.set(symbol, quote);
-          await this.setCacheQuote(cacheKey, quote);
-          continue;
-        }
+        // Process database results
+        const dbCacheMap = new Map(dbCaches.map(cache => [cache.symbol, cache]));
 
-        // Symbol not in cache, needs API fetch
-        uncachedSymbols.push(symbol);
+        const backfillPromises: Promise<void>[] = [];
+        for (const symbol of symbolsToCheckDb) {
+          const dbCache = dbCacheMap.get(symbol);
+
+          if (dbCache && this.isCacheValid(dbCache.lastUpdated)) {
+            const quote = this.formatQuote(dbCache);
+            results.set(symbol, quote);
+            // Backfill Redis cache in parallel
+            backfillPromises.push(this.setCacheQuote(`quote:${symbol}`, quote));
+          } else {
+            // Symbol not in cache or cache expired, needs API fetch
+            uncachedSymbols.push(symbol);
+          }
+        }
+        await Promise.all(backfillPromises);
       } catch (error) {
-        logger.warn(`Cache error for ${symbol}:`, error);
-        uncachedSymbols.push(symbol);
+        logger.error('Database batch query failed:', error);
+        // On error, treat all symbolsToCheckDb as uncached
+        uncachedSymbols.push(...symbolsToCheckDb);
       }
     }
 
@@ -263,15 +327,20 @@ export class MarketDataService {
 
   /**
    * Fetch quotes for multiple symbols from API (batch operation)
-   * Priority: Alpha Vantage batch -> Finnhub parallel -> Individual fallback
+   * Priority: Alpha Vantage -> Finnhub parallel -> yfinance batch
+   * Note: For batch operations, Finnhub's parallel fetching is tried before yfinance's batch API
+   * because Finnhub's parallel approach is generally faster and more reliable for multiple symbols.
+   * This differs from single-quote fetches where yfinance is tried second.
    */
   private async fetchQuoteBatchFromAPI(symbols: string[]): Promise<Map<string, MarketQuote>> {
     let quotes = new Map<string, MarketQuote>();
 
-    // Try Alpha Vantage batch API first (Primary)
-    if (env.ALPHA_VANTAGE_API_KEY && symbols.length > 0) {
+    // Try Alpha Vantage ONLY for small batches (< 5 symbols)
+    // With 12-second rate limit, larger batches would be impractically slow
+    // (e.g., 10 symbols = 2 minutes, 20 symbols = 4 minutes)
+    if (env.ALPHA_VANTAGE_API_KEY && symbols.length > 0 && symbols.length < 5) {
       try {
-        quotes = await alphaVantageQueue.add(() => this.fetchBatchFromAlphaVantage(symbols));
+        quotes = await this.fetchBatchFromAlphaVantage(symbols);
         if (quotes.size > 0) {
           logger.info(`Alpha Vantage batch: Successfully fetched ${quotes.size}/${symbols.length} symbols`);
           return quotes;
@@ -279,6 +348,8 @@ export class MarketDataService {
       } catch (error: any) {
         logger.warn(`Alpha Vantage batch failed:`, error.message);
       }
+    } else if (env.ALPHA_VANTAGE_API_KEY && symbols.length >= 5) {
+      logger.info(`Skipping Alpha Vantage for batch of ${symbols.length} symbols (would take ~${symbols.length * 12}s). Using faster providers.`);
     }
 
     // Try Finnhub parallel fetches (Tertiary - faster than sequential)
@@ -401,48 +472,38 @@ export class MarketDataService {
 
   /**
    * Fetch batch quotes from Alpha Vantage
-   * Uses BATCH_STOCK_QUOTES endpoint (up to 100 symbols)
+   *
+   * PERFORMANCE WARNING: Alpha Vantage free tier only supports individual requests
+   * with a rate limit of 5 requests/minute (12 seconds between requests).
+   * Batch operations will be EXTREMELY SLOW:
+   * - 5 symbols = 60 seconds
+   * - 10 symbols = 120 seconds (2 minutes)
+   * - 20 symbols = 240 seconds (4 minutes)
+   *
+   * This method should only be used for small batches (< 5 symbols) or when
+   * other providers are unavailable.
    */
   private async fetchBatchFromAlphaVantage(symbols: string[]): Promise<Map<string, MarketQuote>> {
     const quotes = new Map<string, MarketQuote>();
+    const failedSymbols: string[] = [];
 
-    // Alpha Vantage batch API only supports up to 100 symbols
-    const symbolsToFetch = symbols.slice(0, 100);
-    const symbolsParam = symbolsToFetch.join(',');
+    // Alpha Vantage free API only supports individual GLOBAL_QUOTE requests.
+    // With rate limiting (5 req/min), large batches will be very slow.
+    // Use alphaVantageQueue to respect rate limits (12 sec between requests)
+    const promises = symbols.map((symbol) =>
+      alphaVantageQueue.add(() => this.fetchFromAlphaVantage(symbol))
+        .then((quote) => quotes.set(symbol, quote))
+        .catch((error) => {
+          failedSymbols.push(symbol);
+          logger.warn(`Alpha Vantage failed for ${symbol}:`, error.message);
+        })
+    );
 
-    const url = `https://www.alphavantage.co/query`;
-    const response = await axios.get(url, {
-      params: {
-        function: 'BATCH_STOCK_QUOTES',
-        symbols: symbolsParam,
-        apikey: env.ALPHA_VANTAGE_API_KEY,
-      },
-      timeout: 10000,
-    });
+    await Promise.all(promises);
 
-    const stockQuotes = response.data['Stock Quotes'];
-
-    if (!stockQuotes || !Array.isArray(stockQuotes)) {
-      throw new AppError('Invalid response from Alpha Vantage batch API', 500);
-    }
-
-    for (const quote of stockQuotes) {
-      const symbol = quote['1. symbol'];
-      const price = parseFloat(quote['2. price']);
-      const volume = parseInt(quote['3. volume']) || undefined;
-      const timestamp = quote['4. timestamp'];
-
-      if (symbol && price) {
-        quotes.set(symbol, {
-          symbol: symbol.toUpperCase(),
-          assetType: 'STOCK',
-          currentPrice: price,
-          change24h: 0, // Batch API doesn't provide change
-          changePercentage: 0,
-          volume,
-          lastUpdated: timestamp ? new Date(timestamp) : new Date(),
-        });
-      }
+    // Log summary of batch results
+    if (failedSymbols.length > 0) {
+      logger.warn(`Alpha Vantage batch: ${failedSymbols.length}/${symbols.length} symbols failed: ${failedSymbols.join(', ')}`);
     }
 
     return quotes;
@@ -454,17 +515,25 @@ export class MarketDataService {
    */
   private async fetchBatchFromFinnhub(symbols: string[]): Promise<Map<string, MarketQuote>> {
     const quotes = new Map<string, MarketQuote>();
+    const failedSymbols: string[] = [];
 
     // Fetch in parallel but respect rate limit
     const promises = symbols.map((symbol) =>
       finnhubQueue.add(() => this.fetchFromFinnhub(symbol))
         .then((quote) => quotes.set(symbol, quote))
         .catch((error) => {
+          failedSymbols.push(symbol);
           logger.warn(`Finnhub failed for ${symbol}:`, error.message);
         })
     );
 
     await Promise.all(promises);
+
+    // Log summary of batch results
+    if (failedSymbols.length > 0) {
+      logger.warn(`Finnhub batch: ${failedSymbols.length}/${symbols.length} symbols failed: ${failedSymbols.join(', ')}`);
+    }
+
     return quotes;
   }
 
@@ -474,17 +543,18 @@ export class MarketDataService {
    */
   private async fetchBatchFromYFinance(symbols: string[]): Promise<Map<string, MarketQuote>> {
     const quotes = new Map<string, MarketQuote>();
+    const failedSymbols: string[] = [];
 
     // Try batch endpoint if available
     try {
       const url = `http://localhost:5001/quotes/batch`;
-      const response = await axios.post(url, { symbols }, { timeout: 10000 });
+      const response = await axios.post<YFinanceBatchResponse>(url, { symbols }, { timeout: 10000 });
 
       if (response.status === 200 && response.data) {
-        for (const [symbol, data] of Object.entries(response.data)) {
-          const quoteData = data as any;
+        const successCount = Object.keys(response.data).length;
+        for (const [symbol, quoteData] of Object.entries(response.data)) {
           quotes.set(symbol, {
-            symbol: quoteData.symbol || symbol,
+            symbol: quoteData.symbol,
             assetType: quoteData.assetType || 'STOCK',
             currentPrice: quoteData.currentPrice,
             change24h: quoteData.change24h,
@@ -494,6 +564,16 @@ export class MarketDataService {
             lastUpdated: new Date(),
           });
         }
+
+        // Log which symbols failed in batch response
+        if (successCount < symbols.length) {
+          const receivedSymbols = Object.keys(response.data);
+          const receivedSymbolsSet = new Set(receivedSymbols.map(s => s.toUpperCase()));
+          const symbolsUpper = symbols.map(s => s.toUpperCase());
+          const missingSymbols = symbolsUpper.filter(s => !receivedSymbolsSet.has(s));
+          logger.warn(`yfinance batch: ${missingSymbols.length}/${symbols.length} symbols returned no data: ${missingSymbols.join(', ')}`);
+        }
+
         return quotes;
       }
     } catch (error) {
@@ -505,11 +585,18 @@ export class MarketDataService {
       yfinanceQueue.add(() => this.fetchFromYFinance(symbol))
         .then((quote) => quotes.set(symbol, quote))
         .catch((error) => {
+          failedSymbols.push(symbol);
           logger.warn(`yfinance failed for ${symbol}:`, error.message);
         })
     );
 
     await Promise.all(promises);
+
+    // Log summary for individual fallback
+    if (failedSymbols.length > 0) {
+      logger.warn(`yfinance batch (individual fallback): ${failedSymbols.length}/${symbols.length} symbols failed: ${failedSymbols.join(', ')}`);
+    }
+
     return quotes;
   }
 

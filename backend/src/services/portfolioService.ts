@@ -36,6 +36,19 @@ export class PortfolioService {
       throw new AppError('Portfolio not found', 404);
     }
 
+    // Early return if no holdings to avoid unnecessary batch API call
+    if (portfolio.holdings.length === 0) {
+      return {
+        id: portfolio.id,
+        userId: portfolio.userId,
+        name: portfolio.name,
+        cashBalance: portfolio.cashBalance.toNumber(),
+        totalValue: portfolio.cashBalance.toNumber(),
+        holdings: [],
+        createdAt: portfolio.createdAt,
+      };
+    }
+
     // Enrich holdings with current market data using batch API
     const symbols = portfolio.holdings.map((h) => h.symbol);
     const marketDataMap = await marketDataService.getQuoteBatch(symbols);

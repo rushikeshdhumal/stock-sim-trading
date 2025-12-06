@@ -22,18 +22,21 @@ export class RequestQueue {
     if (this.processing || this.queue.length === 0) return;
 
     this.processing = true;
-    const item = this.queue.shift()!;
-
-    try {
-      const result = await item.fn();
-      item.resolve(result);
-    } catch (error) {
-      item.reject(error);
+    // Continue processing as long as there are items in the queue
+    // This handles items added during processing without recursion
+    while (this.queue.length > 0) {
+      const item = this.queue.shift()!;
+      try {
+        const result = await item.fn();
+        item.resolve(result);
+      } catch (error) {
+        item.reject(error);
+      }
+      if (this.queue.length > 0) {
+        await this.delay(this.delayMs);
+      }
     }
-
-    await this.delay(this.delayMs);
     this.processing = false;
-    this.processQueue();
   }
 
   private delay(ms: number): Promise<void> {
