@@ -316,6 +316,8 @@ export class MarketDataService {
   /**
    * Fetch quotes for multiple symbols from API (batch operation)
    * Priority: Alpha Vantage -> Finnhub parallel -> yfinance batch
+   * Note: The batch fallback order differs from the single-quote method (which is Alpha Vantage -> yfinance -> Finnhub).
+   * This is because Finnhub's batch/parallel fetch is generally faster and more reliable for multiple symbols than yfinance's batch API.
    */
   private async fetchQuoteBatchFromAPI(symbols: string[]): Promise<Map<string, MarketQuote>> {
     let quotes = new Map<string, MarketQuote>();
