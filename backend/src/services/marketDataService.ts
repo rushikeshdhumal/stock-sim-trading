@@ -485,7 +485,7 @@ export class MarketDataService {
           assetType: 'STOCK',
           currentPrice: parseFloat(quoteData['05. price']),
           change24h: parseFloat(quoteData['09. change']) || 0,
-          changePercentage: parseFloat(quoteData['10. change percent']) || 0,
+          changePercentage: parseFloat(quoteData['10. change percent']?.replace('%', '') || '0') || 0,
           volume: parseInt(quoteData['06. volume']) || undefined,
           lastUpdated: new Date(),
         });
