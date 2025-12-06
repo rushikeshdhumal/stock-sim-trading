@@ -19,11 +19,18 @@ router.get('/', watchlistController.getWatchlist);
 // POST /api/watchlist - Add symbol to watchlist
 router.post('/', validate(addToWatchlistSchema), watchlistController.addToWatchlist);
 
-// DELETE /api/watchlist/:id - Remove symbol from watchlist
+// DELETE /api/watchlist/:id - Remove symbol from watchlist by ID
 router.delete(
   '/:id',
   validate(removeFromWatchlistSchema),
   watchlistController.removeFromWatchlist
+);
+
+// DELETE /api/watchlist/symbol/:symbol - Remove symbol from watchlist by symbol (more efficient)
+router.delete(
+  '/symbol/:symbol',
+  validate(checkWatchlistStatusSchema),
+  watchlistController.removeFromWatchlistBySymbol
 );
 
 // GET /api/watchlist/check/:symbol - Check if symbol is in watchlist

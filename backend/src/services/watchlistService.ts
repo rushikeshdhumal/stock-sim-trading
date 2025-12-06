@@ -116,3 +116,17 @@ export async function getWatchlistItemBySymbol(userId: string, symbol: string) {
     },
   });
 }
+
+/**
+ * Remove a symbol from user's watchlist by symbol (more efficient than by ID)
+ */
+export async function removeFromWatchlistBySymbol(userId: string, symbol: string) {
+  return await prisma.watchlist.delete({
+    where: {
+      userId_symbol: {
+        userId,
+        symbol: symbol.toUpperCase(),
+      },
+    },
+  });
+}

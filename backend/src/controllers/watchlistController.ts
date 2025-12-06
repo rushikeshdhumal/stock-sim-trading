@@ -62,6 +62,23 @@ export const removeFromWatchlist = async (req: Request, res: Response) => {
   }
 };
 
+export const removeFromWatchlistBySymbol = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const { symbol } = req.params;
+
+    await watchlistService.removeFromWatchlistBySymbol(userId, symbol);
+
+    res.json({
+      success: true,
+      message: 'Removed from watchlist',
+    });
+  } catch (error) {
+    logger.error('Error removing from watchlist by symbol:', error);
+    res.status(500).json({ error: 'Failed to remove from watchlist' });
+  }
+};
+
 export const checkWatchlistStatus = async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId;
@@ -83,5 +100,6 @@ export default {
   getWatchlist,
   addToWatchlist,
   removeFromWatchlist,
+  removeFromWatchlistBySymbol,
   checkWatchlistStatus,
 };

@@ -97,13 +97,8 @@ export default function Market() {
 
     try {
       if (isInWatchlist) {
-        // Find the watchlist item and remove it
-        const watchlist = await watchlistService.getWatchlist();
-        const item = watchlist.find((w) => w.symbol === symbol);
-        if (item) {
-          await watchlistService.removeFromWatchlist(item.id);
-          toast.success(`${symbol} removed from watchlist`);
-        }
+        await watchlistService.removeFromWatchlistBySymbol(symbol);
+        toast.success(`${symbol} removed from watchlist`);
       } else {
         await watchlistService.addToWatchlist(symbol, assetType);
         toast.success(`${symbol} added to watchlist`);
