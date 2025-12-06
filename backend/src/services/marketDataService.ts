@@ -328,9 +328,10 @@ export class MarketDataService {
   private async fetchQuoteBatchFromAPI(symbols: string[]): Promise<Map<string, MarketQuote>> {
     let quotes = new Map<string, MarketQuote>();
 
-    // Try Alpha Vantage batch API first (Primary)
-    // Note: fetchBatchFromAlphaVantage already handles rate limiting internally via alphaVantageQueue
-    if (env.ALPHA_VANTAGE_API_KEY && symbols.length > 0) {
+    // Try Alpha Vantage ONLY for small batches (< 5 symbols)
+    // With 12-second rate limit, larger batches would be impractically slow
+    // (e.g., 10 symbols = 2 minutes, 20 symbols = 4 minutes)
+    if (env.ALPHA_VANTAGE_API_KEY && symbols.length > 0 && symbols.length < 5) {
       try {
         quotes = await this.fetchBatchFromAlphaVantage(symbols);
         if (quotes.size > 0) {
@@ -340,6 +341,8 @@ export class MarketDataService {
       } catch (error: any) {
         logger.warn(`Alpha Vantage batch failed:`, error.message);
       }
+    } else if (env.ALPHA_VANTAGE_API_KEY && symbols.length >= 5) {
+      logger.info(`Skipping Alpha Vantage for batch of ${symbols.length} symbols (would take ~${symbols.length * 12}s). Using faster providers.`);
     }
 
     // Try Finnhub parallel fetches (Tertiary - faster than sequential)
@@ -462,6 +465,16 @@ export class MarketDataService {
 
   /**
    * Fetch batch quotes from Alpha Vantage
+   *
+   * PERFORMANCE WARNING: Alpha Vantage free tier only supports individual requests
+   * with a rate limit of 5 requests/minute (12 seconds between requests).
+   * Batch operations will be EXTREMELY SLOW:
+   * - 5 symbols = 60 seconds
+   * - 10 symbols = 120 seconds (2 minutes)
+   * - 20 symbols = 240 seconds (4 minutes)
+   *
+   * This method should only be used for small batches (< 5 symbols) or when
+   * other providers are unavailable.
    */
   private async fetchBatchFromAlphaVantage(symbols: string[]): Promise<Map<string, MarketQuote>> {
     const quotes = new Map<string, MarketQuote>();
