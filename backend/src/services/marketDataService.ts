@@ -124,19 +124,21 @@ export class MarketDataService {
         // Process database results
         const dbCacheMap = new Map(dbCaches.map(cache => [cache.symbol, cache]));
 
+        const backfillPromises: Promise<void>[] = [];
         for (const symbol of symbolsToCheckDb) {
           const dbCache = dbCacheMap.get(symbol);
 
           if (dbCache && this.isCacheValid(dbCache.lastUpdated)) {
             const quote = this.formatQuote(dbCache);
             results.set(symbol, quote);
-            // Backfill Redis cache
-            await this.setCacheQuote(`quote:${symbol}`, quote);
+            // Backfill Redis cache in parallel
+            backfillPromises.push(this.setCacheQuote(`quote:${symbol}`, quote));
           } else {
             // Symbol not in cache or cache expired, needs API fetch
             uncachedSymbols.push(symbol);
           }
         }
+        await Promise.all(backfillPromises);
       } catch (error) {
         logger.error('Database batch query failed:', error);
         // On error, treat all symbolsToCheckDb as uncached
