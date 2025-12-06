@@ -63,7 +63,7 @@ export const initializeScheduledJobs = () => {
     const isMarketHours = hour >= 9 && hour <= 16;
 
     if (isWeekday && isMarketHours) {
-      logger.info(`Running scheduled leaderboard update (EST time: ${estTime.toLocaleTimeString('en-US', { timeZone: 'America/New_York' })})...`);
+      logger.info(`Running scheduled leaderboard update (EST time: ${now.toLocaleTimeString('en-US', { timeZone: 'America/New_York' })})...`);
       try {
         await leaderboardService.calculateLeaderboards();
         logger.info('Scheduled leaderboard update completed');
@@ -71,7 +71,7 @@ export const initializeScheduledJobs = () => {
         logger.error('Scheduled leaderboard update failed:', error);
       }
     } else {
-      logger.debug(`Skipping leaderboard update - outside market hours (EST time: ${estTime.toLocaleTimeString('en-US', { timeZone: 'America/New_York' })}, ${isWeekday ? 'weekday' : 'weekend'})`);
+      logger.debug(`Skipping leaderboard update - outside market hours (EST time: ${now.toLocaleTimeString('en-US', { timeZone: 'America/New_York' })}, ${isWeekday ? 'weekday' : 'weekend'})`);
     }
   });
 
