@@ -35,10 +35,9 @@ export class RequestQueue {
       }
     }
     // If new items were added during processing, process them now
+    this.processing = false;
     if (this.queue.length > 0) {
       this.processQueue();
-    } else {
-      this.processing = false;
     }
   }
 
