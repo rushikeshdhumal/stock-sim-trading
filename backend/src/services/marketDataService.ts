@@ -460,8 +460,10 @@ export class MarketDataService {
     const failedSymbols: string[] = [];
     const missingDataSymbols: string[] = [];
 
-    // Alpha Vantage free API only supports individual GLOBAL_QUOTE requests
-    const symbolsToFetch = symbols.slice(0, 100);
+    // Alpha Vantage free API only supports individual GLOBAL_QUOTE requests.
+    // With rate limiting (5 req/min), large batches will be very slow.
+    // Consider falling back to other providers for batches > 10 symbols.
+    const symbolsToFetch = symbols.slice(0, 10); // Limit for practical performance
     for (const symbol of symbolsToFetch) {
       try {
         const url = `https://www.alphavantage.co/query`;
