@@ -541,7 +541,9 @@ export class MarketDataService {
         // Log which symbols failed in batch response
         if (successCount < symbols.length) {
           const receivedSymbols = Object.keys(response.data);
-          const missingSymbols = symbols.filter(s => !receivedSymbols.includes(s));
+          const receivedSymbolsUpper = receivedSymbols.map(s => s.toUpperCase());
+          const symbolsUpper = symbols.map(s => s.toUpperCase());
+          const missingSymbols = symbolsUpper.filter(s => !receivedSymbolsUpper.includes(s));
           logger.warn(`yfinance batch: ${missingSymbols.length}/${symbols.length} symbols returned no data: ${missingSymbols.join(', ')}`);
         }
 
