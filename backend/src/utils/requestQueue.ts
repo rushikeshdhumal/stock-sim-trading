@@ -46,5 +46,4 @@ export class RequestQueue {
 
 // Singleton instances for each API
 export const alphaVantageQueue = new RequestQueue(12000); // 12 sec (5 req/min)
-export const yfinanceQueue = new RequestQueue(1000);      // 1 sec
 export const finnhubQueue = new RequestQueue(1000);       // 1 sec (60 req/min)

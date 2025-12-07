@@ -5,35 +5,14 @@ import { env } from '../config/env';
 import { AppError } from '../middleware/errorHandler';
 import { MarketQuote } from '../types';
 import logger from '../config/logger';
-import { alphaVantageQueue, yfinanceQueue, finnhubQueue } from '../utils/requestQueue';
+import { alphaVantageQueue, finnhubQueue } from '../utils/requestQueue';
 
 const prisma = getPrismaClient();
 const CACHE_TTL = parseInt(env.MARKET_DATA_CACHE_TTL);
 
 // API Response Type Definitions
-// Note: yfinance API always returns symbol, but assetType may be missing (defaults to 'STOCK')
-interface YFinanceBatchQuote {
-  symbol: string;
-  assetType?: string; // Optional: defaults to 'STOCK' if not provided
-  currentPrice: number;
-  change24h: number;
-  changePercentage: number;
-  volume?: number;
-  marketCap?: number;
-}
-
-interface YFinanceBatchResponse {
-  [symbol: string]: YFinanceBatchQuote;
-}
 
 export class MarketDataService {
-  /**
-   * Detect if a symbol is crypto based on pattern
-   */
-  private isCryptoSymbol(symbol: string): boolean {
-    // Crypto symbols typically end with -USD, -USDT, etc.
-    return symbol.includes('-USD') || symbol.includes('-USDT') || symbol.includes('-EUR');
-  }
 
   /**
    * Get quote for a symbol (with caching)
@@ -249,11 +228,10 @@ export class MarketDataService {
   }
 
   /**
-   * Get trending assets
+   * Get trending assets (stocks only)
    */
   async getTrending(): Promise<any[]> {
     // Curated list of trending stocks
-    // Note: Crypto requires yfinance microservice on port 5001 (not currently running)
     const trendingStocks = [
       'AAPL',      // Apple
       'MSFT',      // Microsoft
@@ -310,7 +288,7 @@ export class MarketDataService {
 
   /**
    * Fetch quote from external API with fallback chain
-   * Priority: Alpha Vantage -> yfinance -> Finnhub
+   * Priority: Alpha Vantage -> Finnhub
    * Uses request queues to prevent rate limiting
    */
   private async fetchQuoteFromAPI(symbol: string): Promise<MarketQuote> {
@@ -326,15 +304,7 @@ export class MarketDataService {
       }
     }
 
-    // Try yfinance service (Secondary)
-    try {
-      quote = await yfinanceQueue.add(() => this.fetchFromYFinance(symbol));
-      if (quote) return quote;
-    } catch (error: any) {
-      logger.warn(`yfinance failed for ${symbol}:`, error.message);
-    }
-
-    // Try Finnhub (Tertiary)
+    // Try Finnhub (Secondary)
     if (env.FINNHUB_API_KEY) {
       try {
         quote = await finnhubQueue.add(() => this.fetchFromFinnhub(symbol));
@@ -350,10 +320,7 @@ export class MarketDataService {
 
   /**
    * Fetch quotes for multiple symbols from API (batch operation)
-   * Priority: Alpha Vantage -> Finnhub parallel -> yfinance batch
-   * Note: For batch operations, Finnhub's parallel fetching is tried before yfinance's batch API
-   * because Finnhub's parallel approach is generally faster and more reliable for multiple symbols.
-   * This differs from single-quote fetches where yfinance is tried second.
+   * Priority: Alpha Vantage -> Finnhub parallel
    */
   private async fetchQuoteBatchFromAPI(symbols: string[]): Promise<Map<string, MarketQuote>> {
     let quotes = new Map<string, MarketQuote>();
@@ -388,17 +355,6 @@ export class MarketDataService {
       }
     }
 
-    // Fallback: Try yfinance if available
-    try {
-      quotes = await this.fetchBatchFromYFinance(symbols);
-      if (quotes.size > 0) {
-        logger.info(`yfinance batch: Successfully fetched ${quotes.size}/${symbols.length} symbols`);
-        return quotes;
-      }
-    } catch (error: any) {
-      logger.warn(`yfinance batch failed:`, error.message);
-    }
-
     throw new AppError(`Unable to fetch batch quotes for ${symbols.length} symbols from any API`, 503);
   }
 
@@ -428,7 +384,7 @@ export class MarketDataService {
 
     return {
       symbol: symbol.toUpperCase(),
-      assetType: this.isCryptoSymbol(symbol) ? 'CRYPTO' : 'STOCK',
+      assetType: 'STOCK',
       currentPrice,
       change24h: change,
       changePercentage: changePercent,
@@ -437,30 +393,6 @@ export class MarketDataService {
     };
   }
 
-  /**
-   * Fetch from yfinance Python microservice
-   */
-  private async fetchFromYFinance(symbol: string): Promise<MarketQuote> {
-    const url = `http://localhost:5001/quote/${symbol}`;
-    const response = await axios.get(url, { timeout: 5000 });
-
-    if (response.status !== 200 || !response.data) {
-      throw new Error('Symbol not found in yfinance');
-    }
-
-    const data = response.data;
-
-    return {
-      symbol: data.symbol,
-      assetType: data.assetType || (this.isCryptoSymbol(symbol) ? 'CRYPTO' : 'STOCK'),
-      currentPrice: data.currentPrice,
-      change24h: data.change24h,
-      changePercentage: data.changePercentage,
-      volume: data.volume || undefined,
-      marketCap: data.marketCap || undefined,
-      lastUpdated: new Date(),
-    };
-  }
 
   /**
    * Fetch from Finnhub API
@@ -483,7 +415,7 @@ export class MarketDataService {
 
     return {
       symbol: symbol.toUpperCase(),
-      assetType: this.isCryptoSymbol(symbol) ? 'CRYPTO' : 'STOCK',
+      assetType: 'STOCK',
       currentPrice: data.c,
       change24h: data.d,
       changePercentage: data.dp,
@@ -555,69 +487,6 @@ export class MarketDataService {
     // Log summary of batch results
     if (failedSymbols.length > 0) {
       logger.warn(`Finnhub batch: ${failedSymbols.length}/${symbols.length} symbols failed: ${failedSymbols.join(', ')}`);
-    }
-
-    return quotes;
-  }
-
-  /**
-   * Fetch batch quotes from yfinance
-   * The Python microservice should support batch fetching
-   */
-  private async fetchBatchFromYFinance(symbols: string[]): Promise<Map<string, MarketQuote>> {
-    const quotes = new Map<string, MarketQuote>();
-    const failedSymbols: string[] = [];
-
-    // Try batch endpoint if available
-    try {
-      const url = `http://localhost:5001/quotes/batch`;
-      const response = await axios.post<YFinanceBatchResponse>(url, { symbols }, { timeout: 10000 });
-
-      if (response.status === 200 && response.data) {
-        const successCount = Object.keys(response.data).length;
-        for (const [symbol, quoteData] of Object.entries(response.data)) {
-          quotes.set(symbol, {
-            symbol: quoteData.symbol,
-            assetType: quoteData.assetType || (this.isCryptoSymbol(symbol) ? 'CRYPTO' : 'STOCK'),
-            currentPrice: quoteData.currentPrice,
-            change24h: quoteData.change24h,
-            changePercentage: quoteData.changePercentage,
-            volume: quoteData.volume || undefined,
-            marketCap: quoteData.marketCap || undefined,
-            lastUpdated: new Date(),
-          });
-        }
-
-        // Log which symbols failed in batch response
-        if (successCount < symbols.length) {
-          const receivedSymbols = Object.keys(response.data);
-          const receivedSymbolsSet = new Set(receivedSymbols.map(s => s.toUpperCase()));
-          const symbolsUpper = symbols.map(s => s.toUpperCase());
-          const missingSymbols = symbolsUpper.filter(s => !receivedSymbolsSet.has(s));
-          logger.warn(`yfinance batch: ${missingSymbols.length}/${symbols.length} symbols returned no data: ${missingSymbols.join(', ')}`);
-        }
-
-        return quotes;
-      }
-    } catch (error) {
-      logger.warn('yfinance batch endpoint not available, falling back to individual requests');
-    }
-
-    // Fallback: fetch individually
-    const promises = symbols.map((symbol) =>
-      yfinanceQueue.add(() => this.fetchFromYFinance(symbol))
-        .then((quote) => quotes.set(symbol, quote))
-        .catch((error) => {
-          failedSymbols.push(symbol);
-          logger.warn(`yfinance failed for ${symbol}:`, error.message);
-        })
-    );
-
-    await Promise.all(promises);
-
-    // Log summary for individual fallback
-    if (failedSymbols.length > 0) {
-      logger.warn(`yfinance batch (individual fallback): ${failedSymbols.length}/${symbols.length} symbols failed: ${failedSymbols.join(', ')}`);
     }
 
     return quotes;

@@ -47,8 +47,7 @@ A full-stack gamified stock trading simulation platform that allows users to lea
 
 ### External APIs
 - **Alpha Vantage**: Primary stock market data source
-- **Yahoo Finance** (yfinance): Fallback when Alpha Vantage rate limits are reached
-- **CoinGecko**: Cryptocurrency data (configured)
+- **Finnhub**: Fallback when Alpha Vantage rate limits are reached
 
 ## Project Structure
 
@@ -170,7 +169,7 @@ The application uses PostgreSQL with 10 main tables:
 |-------|-------------|
 | `users` | User accounts and authentication credentials |
 | `portfolios` | User portfolios with cash balances |
-| `holdings` | Current asset positions (stocks/crypto) |
+| `holdings` | Current stock positions |
 | `trades` | Complete trade history (buy/sell orders) |
 | `market_data_cache` | Cached API responses for market data |
 | `leaderboards` | User rankings by time period |
@@ -204,7 +203,7 @@ See [docs/DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md) for detailed schema infor
 - `POST /api/trades/validate` - Validate trade before execution
 
 ### Market Data
-- `GET /api/market/search` - Search stocks/crypto by symbol or name
+- `GET /api/market/search` - Search stocks by symbol or name
 - `GET /api/market/quote/:symbol` - Get current price quote
 - `GET /api/market/historical/:symbol` - Get historical price data
 - `GET /api/market/trending` - Get trending assets
@@ -392,8 +391,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## Acknowledgments
 
 - **Alpha Vantage** - Real-time and historical stock market data
-- **Yahoo Finance** - Fallback market data source
-- **CoinGecko** - Cryptocurrency data
+- **Finnhub** - Fallback market data source
 - **Prisma** - Next-generation ORM
 - **React Team** - Frontend framework
 - **All Contributors** - Open-source community

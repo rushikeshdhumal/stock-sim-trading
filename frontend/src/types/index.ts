@@ -27,7 +27,7 @@ export interface Portfolio {
 export interface Holding {
   id: string;
   symbol: string;
-  assetType: 'STOCK' | 'CRYPTO';
+  assetType: 'STOCK';
   quantity: number;
   averageCost: number;
   currentPrice?: number;
@@ -45,7 +45,7 @@ export interface Trade {
   id: string;
   portfolioId: string;
   symbol: string;
-  assetType: 'STOCK' | 'CRYPTO';
+  assetType: 'STOCK';
   tradeType: 'BUY' | 'SELL';
   quantity: number;
   price: number;
@@ -56,7 +56,7 @@ export interface Trade {
 export interface TradeRequest {
   portfolioId: string;
   symbol: string;
-  assetType: 'STOCK' | 'CRYPTO';
+  assetType: 'STOCK';
   quantity: number;
 }
 
@@ -71,7 +71,7 @@ export interface TradeResult {
 // Market data types
 export interface MarketQuote {
   symbol: string;
-  assetType: 'STOCK' | 'CRYPTO';
+  assetType: 'STOCK';
   currentPrice: number;
   change24h: number;
   changePercentage: number;

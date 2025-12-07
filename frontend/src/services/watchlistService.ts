@@ -3,7 +3,7 @@ import api from './api';
 export interface WatchlistItem {
   id: string;
   symbol: string;
-  assetType: 'STOCK' | 'CRYPTO';
+  assetType: 'STOCK';
   notes?: string;
   addedAt: string;
   currentPrice?: number;
@@ -17,7 +17,7 @@ const watchlistService = {
     return response.data.data;
   },
 
-  addToWatchlist: async (symbol: string, assetType: 'STOCK' | 'CRYPTO', notes?: string) => {
+  addToWatchlist: async (symbol: string, assetType: 'STOCK', notes?: string) => {
     const response = await api.post('/watchlist', { symbol, assetType, notes });
     return response.data.data;
   },

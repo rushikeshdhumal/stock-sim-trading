@@ -223,7 +223,6 @@ model UserChallenge {
 // Enums
 enum AssetType {
   STOCK
-  CRYPTO
 
   @@map("asset_type")
 }
