@@ -11,7 +11,6 @@ export default function Market() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [trending, setTrending] = useState<MarketQuote[]>([]);
-  const [popular, setPopular] = useState<MarketQuote[]>([]);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [showTradingModal, setShowTradingModal] = useState(false);
@@ -27,14 +26,10 @@ export default function Market() {
 
   const loadMarketData = async () => {
     try {
-      const [trendingData, popularData] = await Promise.all([
-        marketService.getTrending(),
-        marketService.getPopular(),
-      ]);
+      const trendingData = await marketService.getTrending();
       setTrending(trendingData);
-      setPopular(popularData);
       // Load watchlist status after market data is loaded
-      await loadWatchlistStatus(trendingData, popularData, []);
+      await loadWatchlistStatus(trendingData, []);
     } catch (error) {
       console.error('Failed to load market data:', error);
     } finally {
@@ -56,13 +51,11 @@ export default function Market() {
 
   const loadWatchlistStatus = async (
     trendingData: MarketQuote[] = trending,
-    popularData: MarketQuote[] = popular,
     searchData: any[] = searchResults
   ) => {
     try {
       const allSymbols = [
         ...trendingData.map((a) => a.symbol),
-        ...popularData.map((a) => a.symbol),
         ...searchData.map((r) => r.symbol),
       ];
       const uniqueSymbols = [...new Set(allSymbols)];
@@ -131,7 +124,7 @@ export default function Market() {
       const results = await marketService.search(searchQuery);
       setSearchResults(results);
       // Update watchlist status to include search results
-      await loadWatchlistStatus(trending, popular, results);
+      await loadWatchlistStatus(trending, results);
     } catch (error) {
       toast.error('Search failed');
     } finally {
@@ -318,30 +311,6 @@ export default function Market() {
           ) : (
             <div className="card text-center py-12 text-gray-500">
               <p>No trending assets available</p>
-            </div>
-          )}
-        </div>
-
-        {/* Popular on Platform */}
-        <div>
-          <h2 className="text-2xl font-bold mb-4">Popular on Platform</h2>
-          {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="card">
-                  <div className="skeleton h-6 w-20 mb-2"></div>
-                  <div className="skeleton h-8 w-32 mb-4"></div>
-                  <div className="skeleton h-4 w-full"></div>
-                </div>
-              ))}
-            </div>
-          ) : popular.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {popular.map((asset) => renderAssetCard(asset))}
-            </div>
-          ) : (
-            <div className="card text-center py-12 text-gray-500">
-              <p>No popular assets yet. Start trading to see what's popular!</p>
             </div>
           )}
         </div>
