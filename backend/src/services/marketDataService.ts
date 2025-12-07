@@ -252,25 +252,26 @@ export class MarketDataService {
    * Get trending assets
    */
   async getTrending(): Promise<any[]> {
-    // Curated list of trending assets (mix of popular stocks and crypto)
-    const trendingSymbols = [
-      'BTC-USD',   // Bitcoin
-      'ETH-USD',   // Ethereum
+    // Curated list of trending stocks
+    // Note: Crypto requires yfinance microservice on port 5001 (not currently running)
+    const trendingStocks = [
       'AAPL',      // Apple
       'MSFT',      // Microsoft
       'GOOGL',     // Google
       'TSLA',      // Tesla
       'NVDA',      // NVIDIA
-      'SOL-USD',   // Solana
       'AMZN',      // Amazon
       'META',      // Meta
+      'NFLX',      // Netflix
+      'AMD',       // AMD
+      'INTC',      // Intel
     ];
 
-    // Use batch API to get live prices
-    const quotesMap = await this.getQuoteBatch(trendingSymbols);
+    // Fetch all trending stocks using batch API for speed
+    const quotesMap = await this.getQuoteBatch(trendingStocks);
 
     // Convert Map to Array, maintaining order
-    const quotes = trendingSymbols
+    const quotes = trendingStocks
       .map((symbol) => quotesMap.get(symbol))
       .filter((quote): quote is MarketQuote => quote !== undefined);
 
