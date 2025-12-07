@@ -44,12 +44,20 @@ npx prisma db push
 
 ### 5. Start Development Servers
 ```bash
-# Backend (from backend directory)
-npm run dev
+# Start yfinance microservice (from backend directory, in a new terminal)
+.\start-yfinance.ps1        # Port 5001
+
+# Backend (from backend directory, in a new terminal)
+npm run dev                 # Port 3001
 
 # Frontend (in a new terminal, from frontend directory)
-npm run dev
+npm run dev                 # Port 5173
 ```
+
+**Note**: You need 3 terminals running simultaneously for full functionality:
+1. yfinance Python service (port 5001) - Required for crypto symbols and Yahoo Finance fallback
+2. Backend Node.js API (port 3001)
+3. Frontend React dev server (port 5173)
 
 ### 6. Access the Application
 - Frontend: http://localhost:5173
@@ -95,3 +103,9 @@ docker-compose down
   taskkill /F /PID <PID>
   ```
   - Then restart the dev server with `npm run dev`
+
+**yfinance microservice not running:**
+- If you see errors related to fetching crypto symbols or "ECONNREFUSED localhost:5001":
+  - The yfinance Python microservice is required for crypto data and Yahoo Finance fallback
+  - Start it in a separate terminal: `cd backend` then `.\start-yfinance.ps1`
+  - The service runs on port 5001 and must be running for full market data functionality
