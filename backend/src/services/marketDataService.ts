@@ -28,6 +28,14 @@ interface YFinanceBatchResponse {
 
 export class MarketDataService {
   /**
+   * Detect if a symbol is crypto based on pattern
+   */
+  private isCryptoSymbol(symbol: string): boolean {
+    // Crypto symbols typically end with -USD, -USDT, etc.
+    return symbol.includes('-USD') || symbol.includes('-USDT') || symbol.includes('-EUR');
+  }
+
+  /**
    * Get quote for a symbol (with caching)
    */
   async getQuote(symbol: string): Promise<MarketQuote> {
@@ -244,15 +252,29 @@ export class MarketDataService {
    * Get trending assets
    */
   async getTrending(): Promise<any[]> {
-    const trending = await prisma.marketDataCache.findMany({
-      orderBy: { volume: 'desc' },
-      take: 10,
-      where: {
-        volume: { not: null },
-      },
-    });
+    // Curated list of trending assets (mix of popular stocks and crypto)
+    const trendingSymbols = [
+      'BTC-USD',   // Bitcoin
+      'ETH-USD',   // Ethereum
+      'AAPL',      // Apple
+      'MSFT',      // Microsoft
+      'GOOGL',     // Google
+      'TSLA',      // Tesla
+      'NVDA',      // NVIDIA
+      'SOL-USD',   // Solana
+      'AMZN',      // Amazon
+      'META',      // Meta
+    ];
 
-    return trending.map((item) => this.formatQuote(item));
+    // Use batch API to get live prices
+    const quotesMap = await this.getQuoteBatch(trendingSymbols);
+
+    // Convert Map to Array, maintaining order
+    const quotes = trendingSymbols
+      .map((symbol) => quotesMap.get(symbol))
+      .filter((quote): quote is MarketQuote => quote !== undefined);
+
+    return quotes;
   }
 
   /**
@@ -405,7 +427,7 @@ export class MarketDataService {
 
     return {
       symbol: symbol.toUpperCase(),
-      assetType: 'STOCK',
+      assetType: this.isCryptoSymbol(symbol) ? 'CRYPTO' : 'STOCK',
       currentPrice,
       change24h: change,
       changePercentage: changePercent,
@@ -429,7 +451,7 @@ export class MarketDataService {
 
     return {
       symbol: data.symbol,
-      assetType: data.assetType || 'STOCK',
+      assetType: data.assetType || (this.isCryptoSymbol(symbol) ? 'CRYPTO' : 'STOCK'),
       currentPrice: data.currentPrice,
       change24h: data.change24h,
       changePercentage: data.changePercentage,
@@ -460,7 +482,7 @@ export class MarketDataService {
 
     return {
       symbol: symbol.toUpperCase(),
-      assetType: 'STOCK',
+      assetType: this.isCryptoSymbol(symbol) ? 'CRYPTO' : 'STOCK',
       currentPrice: data.c,
       change24h: data.d,
       changePercentage: data.dp,
@@ -555,7 +577,7 @@ export class MarketDataService {
         for (const [symbol, quoteData] of Object.entries(response.data)) {
           quotes.set(symbol, {
             symbol: quoteData.symbol,
-            assetType: quoteData.assetType || 'STOCK',
+            assetType: quoteData.assetType || (this.isCryptoSymbol(symbol) ? 'CRYPTO' : 'STOCK'),
             currentPrice: quoteData.currentPrice,
             change24h: quoteData.change24h,
             changePercentage: quoteData.changePercentage,
