@@ -80,7 +80,7 @@ export default function Market() {
 
   const toggleWatchlist = async (
     symbol: string,
-    assetType: 'STOCK' | 'CRYPTO',
+    assetType: 'STOCK',
     e: React.MouseEvent
   ) => {
     e.stopPropagation(); // Prevent opening trade modal
@@ -152,7 +152,7 @@ export default function Market() {
       >
         {/* Watchlist Button */}
         <button
-          onClick={(e) => toggleWatchlist(asset.symbol, asset.assetType as 'STOCK' | 'CRYPTO', e)}
+          onClick={(e) => toggleWatchlist(asset.symbol, 'STOCK', e)}
           className="absolute top-4 right-4 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
           title={isInWatchlist ? 'Remove from watchlist' : 'Add to watchlist'}
           aria-label={isInWatchlist ? `Remove ${asset.symbol} from watchlist` : `Add ${asset.symbol} to watchlist`}
@@ -247,39 +247,76 @@ export default function Market() {
             <div className="mt-6">
               <h3 className="text-lg font-semibold mb-4">Search Results</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {searchResults.map((result) => (
-                  <div
-                    key={result.symbol}
-                    onClick={() => openTradeModal(result.symbol)}
-                    className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer transition-colors"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="font-bold text-lg">{result.symbol}</div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">
-                          {result.assetType}
-                        </div>
-                      </div>
-                      {result.currentPrice && (
-                        <div className="text-right">
-                          <div className="font-semibold">
-                            ${result.currentPrice.toFixed(2)}
+                {searchResults.map((result) => {
+                  const isInWatchlist = watchlistStatus.get(result.symbol) || false;
+
+                  return (
+                    <div
+                      key={result.symbol}
+                      onClick={() => openTradeModal(result.symbol)}
+                      className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer transition-colors relative"
+                    >
+                      {/* Watchlist Button */}
+                      <button
+                        onClick={(e) => toggleWatchlist(result.symbol, 'STOCK', e)}
+                        className="absolute top-2 right-2 p-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors"
+                        title={isInWatchlist ? 'Remove from watchlist' : 'Add to watchlist'}
+                      >
+                        {isInWatchlist ? (
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-5 w-5 text-yellow-500"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                          >
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        ) : (
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-5 w-5 text-gray-400"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+                            />
+                          </svg>
+                        )}
+                      </button>
+
+                      <div className="flex justify-between items-start pr-8">
+                        <div>
+                          <div className="font-bold text-lg">{result.symbol}</div>
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            {result.assetType}
                           </div>
-                          {result.change24h !== undefined && (
-                            <div
-                              className={`text-sm ${
-                                result.change24h >= 0 ? 'text-success' : 'text-danger'
-                              }`}
-                            >
-                              {result.change24h >= 0 ? '+' : ''}
-                              {result.change24h.toFixed(2)}
-                            </div>
-                          )}
                         </div>
-                      )}
+                        {result.currentPrice && (
+                          <div className="text-right">
+                            <div className="font-semibold">
+                              ${result.currentPrice.toFixed(2)}
+                            </div>
+                            {result.change24h !== undefined && (
+                              <div
+                                className={`text-sm ${
+                                  result.change24h >= 0 ? 'text-success' : 'text-danger'
+                                }`}
+                              >
+                                {result.change24h >= 0 ? '+' : ''}
+                                {result.change24h.toFixed(2)}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -326,6 +363,8 @@ export default function Market() {
         onTradeComplete={handleTradeComplete}
         cashBalance={cashBalance}
         holdings={[]}
+        onToggleWatchlist={toggleWatchlist}
+        watchlistStatus={watchlistStatus}
       />
     </div>
   );
