@@ -103,9 +103,3 @@ docker-compose down
   taskkill /F /PID <PID>
   ```
   - Then restart the dev server with `npm run dev`
-
-**yfinance microservice not running:**
-- If you see errors related to fetching crypto symbols or "ECONNREFUSED localhost:5001":
-  - The yfinance Python microservice is required for crypto data and Yahoo Finance fallback
-  - Start it in a separate terminal: `cd backend` then `.\start-yfinance.ps1`
-  - The service runs on port 5001 and must be running for full market data functionality
