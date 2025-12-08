@@ -91,7 +91,7 @@ export default function Watchlist() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Your Watchlist</h1>
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Track your favorite stocks and cryptocurrencies with real-time prices
+            Track your favorite stocks with real-time prices
           </p>
         </div>
 
