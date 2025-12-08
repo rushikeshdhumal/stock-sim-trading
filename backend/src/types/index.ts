@@ -157,7 +157,7 @@ export interface MarketQuote {
 export const addToWatchlistSchema = z.object({
   body: z.object({
     symbol: z.string().min(1, 'Symbol is required').max(20),
-    assetType: z.enum(['STOCK', 'CRYPTO']),
+    assetType: z.enum(['STOCK']),
     notes: z.string().max(500, 'Notes must be at most 500 characters').optional(),
   }),
 });
