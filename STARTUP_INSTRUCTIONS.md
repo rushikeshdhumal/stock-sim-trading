@@ -44,9 +44,6 @@ npx prisma db push
 
 ### 5. Start Development Servers
 ```bash
-# Start yfinance microservice (from backend directory, in a new terminal)
-.\start-yfinance.ps1        # Port 5001
-
 # Backend (from backend directory, in a new terminal)
 npm run dev                 # Port 3001
 
@@ -54,10 +51,9 @@ npm run dev                 # Port 3001
 npm run dev                 # Port 5173
 ```
 
-**Note**: You need 3 terminals running simultaneously for full functionality:
-1. yfinance Python service (port 5001) - Required for crypto symbols and Yahoo Finance fallback
-2. Backend Node.js API (port 3001)
-3. Frontend React dev server (port 5173)
+**Note**: You need 2 terminals running simultaneously for full functionality:
+1. Backend Node.js API (port 3001)
+2. Frontend React dev server (port 5173)
 
 ### 6. Access the Application
 - Frontend: http://localhost:5173
