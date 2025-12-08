@@ -261,6 +261,7 @@ export default function Market() {
                         onClick={(e) => toggleWatchlist(result.symbol, 'STOCK', e)}
                         className="absolute top-2 right-2 p-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors"
                         title={isInWatchlist ? 'Remove from watchlist' : 'Add to watchlist'}
+                        aria-label={isInWatchlist ? `Remove ${result.symbol} from watchlist` : `Add ${result.symbol} to watchlist`}
                       >
                         {isInWatchlist ? (
                           <svg
