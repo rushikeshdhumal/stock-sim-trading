@@ -18,20 +18,15 @@ User Request → Cache Layer → Request Queue → External API → Cache Update
 
 ### Multi-API Priority System
 
-The system uses a three-tier fallback approach:
+The system uses a two-tier fallback approach:
 
 1. **Primary: Alpha Vantage** (5 requests/minute)
    - Comprehensive stock market data
    - 12-second delay between requests
    - Queue: `alphaVantageQueue`
 
-2. **Secondary: yfinance** (Python microservice)
+2. **Secondary: Finnhub** (60 requests/minute)
    - Fallback for when Alpha Vantage fails or is rate-limited
-   - 1-second delay between requests
-   - Queue: `yfinanceQueue`
-
-3. **Tertiary: Finnhub** (60 requests/minute)
-   - Final fallback option
    - 1-second delay between requests
    - Queue: `finnhubQueue`
 
@@ -80,7 +75,6 @@ Return all 10 quotes
 |-----|--------------|--------|-------------|
 | Alpha Vantage | ❌ Deprecated | `BATCH_STOCK_QUOTES` (deprecated/unavailable in free tier) | 0 |
 | Finnhub | ✅ Parallel | Multiple requests queued | Unlimited |
-| yfinance | ✅ Native | Batch endpoint (optional) | Unlimited |
 
 > **Note:** Alpha Vantage's batch endpoint (`BATCH_STOCK_QUOTES`) is deprecated and no longer available in the free tier. Batch requests for Alpha Vantage will fall back to sequential or parallel single-symbol requests.
 
@@ -106,8 +100,8 @@ const quotes = symbols.map(s => quotesMap.get(s));
 2. **Market Data Service** ([marketDataService.ts:197](backend/src/services/marketDataService.ts:197))
    - `getPopular()` - Fetch trending stocks in one request
 
-3. **Future: Watchlist Service** (Person 2's feature)
-   - Will use batch API for real-time watchlist updates
+3. **Watchlist Service** ([watchlistService.ts:25](backend/src/services/watchlistService.ts:25))
+   - Uses batch API for real-time watchlist updates
 
 #### Intelligent Caching
 
@@ -201,11 +195,9 @@ Return Response
 ```
 Alpha Vantage Error
     ↓
-Queue Request to yfinance
+Queue Request to Finnhub
     ↓ (success or fail)
-If Failed → Queue Request to Finnhub
-    ↓ (success or fail)
-If All Failed → Return 503 Error
+If Both Failed → Return 503 Error
 ```
 
 ## Configuration
@@ -228,7 +220,6 @@ MARKET_DATA_CACHE_TTL=1800  # 30 minutes
 | API | Limit | Queue Delay | Notes |
 |-----|-------|-------------|-------|
 | Alpha Vantage | 5 req/min | 12 seconds | Free tier limit |
-| yfinance | Unlimited | 1 second | Self-hosted microservice |
 | Finnhub | 60 req/min | 1 second | Free tier limit |
 
 ## Optimizations Implemented
@@ -291,11 +282,10 @@ Assuming 100 unique symbols requested per day:
 
 1. **Alpha Vantage Timeout/Error**
    - Logs warning: `Alpha Vantage failed for {symbol}`
-   - Automatically tries yfinance
-
-2. **yfinance Timeout/Error**
-   - Logs warning: `yfinance failed for {symbol}`
    - Automatically tries Finnhub
+
+2. **Finnhub Timeout/Error**
+   - Logs warning: `Finnhub failed for {symbol}`
 
 3. **All APIs Failed**
    - Returns HTTP 503: `Unable to fetch quote for {symbol} from any API`
@@ -425,7 +415,6 @@ npm test -- marketDataService.test.ts
 - **NEW**: Batch API request system for multiple symbols
 - **NOTE**: Alpha Vantage batch quotes endpoint (`BATCH_STOCK_QUOTES`) is deprecated and not available in the free tier. Batch support for Alpha Vantage is currently unavailable.
 - **NEW**: Finnhub parallel batch fetching
-- **NEW**: yfinance batch endpoint integration
 - Updated portfolioService to use batch API (90-97% faster)
 - Updated trending/popular endpoints to use batch API
 - Intelligent cache checking in batch requests
