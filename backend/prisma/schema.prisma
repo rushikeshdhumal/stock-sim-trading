@@ -8,6 +8,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
 // User model for authentication and profile
@@ -25,6 +26,7 @@ model User {
   leaderboards     Leaderboard[]
   userAchievements UserAchievement[]
   userChallenges   UserChallenge[]
+  watchlists       Watchlist[]
 
   @@index([email])
   @@index([username])
@@ -179,6 +181,23 @@ model Challenge {
   @@map("challenges")
 }
 
+// Watchlist model for tracking favorite assets
+model Watchlist {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  symbol    String    @db.VarChar(20)
+  assetType AssetType @map("asset_type")
+  addedAt   DateTime  @default(now()) @map("added_at")
+  notes     String?   @db.Text
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, symbol])
+  @@index([userId])
+  @@map("watchlists")
+}
+
 // User challenge participation
 model UserChallenge {
   id          String          @id @default(uuid())
@@ -204,7 +223,6 @@ model UserChallenge {
 // Enums
 enum AssetType {
   STOCK
-  CRYPTO
 
   @@map("asset_type")
 }

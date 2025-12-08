@@ -36,39 +36,54 @@ export class PortfolioService {
       throw new AppError('Portfolio not found', 404);
     }
 
-    // Enrich holdings with current market data
-    const enrichedHoldings = await Promise.all(
-      portfolio.holdings.map(async (holding) => {
-        try {
-          const marketData = await marketDataService.getQuote(holding.symbol);
-          const currentValue = marketData.currentPrice * holding.quantity.toNumber();
-          const costBasis = holding.averageCost.toNumber() * holding.quantity.toNumber();
-          const profitLoss = currentValue - costBasis;
-          const profitLossPercentage = (profitLoss / costBasis) * 100;
+    // Early return if no holdings to avoid unnecessary batch API call
+    if (portfolio.holdings.length === 0) {
+      return {
+        id: portfolio.id,
+        userId: portfolio.userId,
+        name: portfolio.name,
+        cashBalance: portfolio.cashBalance.toNumber(),
+        totalValue: portfolio.cashBalance.toNumber(),
+        holdings: [],
+        createdAt: portfolio.createdAt,
+      };
+    }
 
-          return {
-            id: holding.id,
-            symbol: holding.symbol,
-            assetType: holding.assetType,
-            quantity: holding.quantity.toNumber(),
-            averageCost: holding.averageCost.toNumber(),
-            currentPrice: marketData.currentPrice,
-            currentValue,
-            profitLoss,
-            profitLossPercentage,
-          };
-        } catch (error) {
-          logger.warn(`Failed to get market data for ${holding.symbol}:`, error);
-          return {
-            id: holding.id,
-            symbol: holding.symbol,
-            assetType: holding.assetType,
-            quantity: holding.quantity.toNumber(),
-            averageCost: holding.averageCost.toNumber(),
-          };
-        }
-      })
-    );
+    // Enrich holdings with current market data using batch API
+    const symbols = portfolio.holdings.map((h) => h.symbol);
+    const marketDataMap = await marketDataService.getQuoteBatch(symbols);
+
+    const enrichedHoldings = portfolio.holdings.map((holding) => {
+      const marketData = marketDataMap.get(holding.symbol);
+
+      if (marketData) {
+        const currentValue = marketData.currentPrice * holding.quantity.toNumber();
+        const costBasis = holding.averageCost.toNumber() * holding.quantity.toNumber();
+        const profitLoss = currentValue - costBasis;
+        const profitLossPercentage = (profitLoss / costBasis) * 100;
+
+        return {
+          id: holding.id,
+          symbol: holding.symbol,
+          assetType: holding.assetType,
+          quantity: holding.quantity.toNumber(),
+          averageCost: holding.averageCost.toNumber(),
+          currentPrice: marketData.currentPrice,
+          currentValue,
+          profitLoss,
+          profitLossPercentage,
+        };
+      } else {
+        logger.warn(`Failed to get market data for ${holding.symbol}`);
+        return {
+          id: holding.id,
+          symbol: holding.symbol,
+          assetType: holding.assetType,
+          quantity: holding.quantity.toNumber(),
+          averageCost: holding.averageCost.toNumber(),
+        };
+      }
+    });
 
     return {
       id: portfolio.id,
@@ -130,12 +145,16 @@ export class PortfolioService {
 
     let totalHoldingsValue = 0;
 
-    // Calculate value of all holdings
+    // Calculate value of all holdings using batch API
+    const symbols = portfolio.holdings.map((h) => h.symbol);
+    const marketDataMap = await marketDataService.getQuoteBatch(symbols);
+
     for (const holding of portfolio.holdings) {
-      try {
-        const marketData = await marketDataService.getQuote(holding.symbol);
+      const marketData = marketDataMap.get(holding.symbol);
+
+      if (marketData) {
         totalHoldingsValue += marketData.currentPrice * holding.quantity.toNumber();
-      } catch (error) {
+      } else {
         logger.warn(`Failed to get price for ${holding.symbol}, using average cost`);
         totalHoldingsValue += holding.averageCost.toNumber() * holding.quantity.toNumber();
       }

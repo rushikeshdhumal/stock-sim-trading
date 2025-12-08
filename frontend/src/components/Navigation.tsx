@@ -34,6 +34,9 @@ export default function Navigation() {
             <Link to="/market" className={navLinkClass('/market')}>
               Market
             </Link>
+            <Link to="/watchlist" className={navLinkClass('/watchlist')}>
+              Watchlist
+            </Link>
             <Link to="/leaderboard" className={navLinkClass('/leaderboard')}>
               Leaderboard
             </Link>
@@ -69,6 +72,12 @@ export default function Navigation() {
             className={`${navLinkClass('/market')} text-sm whitespace-nowrap`}
           >
             Market
+          </Link>
+          <Link
+            to="/watchlist"
+            className={`${navLinkClass('/watchlist')} text-sm whitespace-nowrap`}
+          >
+            Watchlist
           </Link>
           <Link
             to="/leaderboard"

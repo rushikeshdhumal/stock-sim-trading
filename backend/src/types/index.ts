@@ -152,3 +152,41 @@ export interface MarketQuote {
   marketCap?: number;
   lastUpdated: Date;
 }
+
+// Watchlist schemas
+export const addToWatchlistSchema = z.object({
+  body: z.object({
+    symbol: z.string().min(1, 'Symbol is required').max(20),
+    assetType: z.enum(['STOCK']),
+    notes: z.string().max(500, 'Notes must be at most 500 characters').optional(),
+  }),
+});
+
+export const removeFromWatchlistSchema = z.object({
+  params: z.object({
+    id: z.string().uuid('Invalid watchlist item ID'),
+  }),
+});
+
+export const checkWatchlistStatusSchema = z.object({
+  params: z.object({
+    symbol: z.string().min(1).max(20),
+  }),
+});
+
+export const checkBatchWatchlistStatusSchema = z.object({
+  body: z.object({
+    symbols: z.array(z.string().min(1).max(20)).min(1, 'At least one symbol required').max(100, 'Maximum 100 symbols allowed'),
+  }),
+});
+
+export interface WatchlistItem {
+  id: string;
+  symbol: string;
+  assetType: string;
+  notes?: string;
+  addedAt: Date;
+  currentPrice?: number;
+  change24h?: number;
+  changePercentage?: number;
+}
