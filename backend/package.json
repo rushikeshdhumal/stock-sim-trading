@@ -10,6 +10,7 @@
     "migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
     "seed": "ts-node prisma/seed.ts",
+    "seed:leaderboard": "ts-node src/scripts/seedLeaderboard.ts",
     "studio": "prisma studio",
     "test": "jest --coverage",
     "test:watch": "jest --watch",
