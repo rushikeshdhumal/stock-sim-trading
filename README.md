@@ -6,7 +6,7 @@ A full-stack gamified stock trading simulation platform that allows users to lea
 
 ### Core Trading Features
 - **Paper Trading**: Execute buy/sell orders with virtual money ($100,000 starting balance)
-- **Real-time Market Data**: Live stock prices from Alpha Vantage with Yahoo Finance fallback
+- **Real-time Market Data**: Live stock prices from Alpha Vantage with Finnhub fallback
 - **Portfolio Management**: Create and manage portfolios with real-time valuations
 - **Transaction History**: View complete trade history with filtering options
 - **Asset Holdings**: Track current positions with profit/loss calculations
@@ -14,11 +14,13 @@ A full-stack gamified stock trading simulation platform that allows users to lea
 ### Gamification
 - **Leaderboards**: Compete with other users on daily, weekly, monthly, and all-time rankings
 - **Achievements System**: Unlock badges based on trading performance and milestones
-- **Challenges**: Join time-bound trading challenges with specific goals
+- **Watchlist**: Save and monitor favorite assets with real-time price updates
 
 ### Technical Features
 - **JWT Authentication**: Secure user authentication with bcrypt password hashing
-- **Redis Caching**: 5-minute cache for market data to optimize API usage
+- **Redis Caching**: 30-minute cache for market data to optimize API usage
+- **Request Queuing**: Intelligent rate limiting to prevent API throttling
+- **Batch API Requests**: Optimized multi-symbol fetching for better performance
 - **Rate Limiting**: Protection against API abuse
 - **Responsive UI**: Dark mode support with modern, clean interface
 - **Real-time Updates**: Live portfolio valuations and market data
@@ -47,7 +49,7 @@ A full-stack gamified stock trading simulation platform that allows users to lea
 
 ### External APIs
 - **Alpha Vantage**: Primary stock market data source
-- **Finnhub**: Fallback when Alpha Vantage rate limits are reached
+- **Finnhub**: Secondary fallback for reliable data fetching
 
 ## Project Structure
 
@@ -84,7 +86,8 @@ stock-sim-trading/
 
 - **Node.js**: Version 18 or higher
 - **PostgreSQL**: Version 14 or higher
-- **Redis**: Latest stable version
+- **Redis**: Latest stable version (via Docker recommended)
+- **Docker Desktop**: For running PostgreSQL and Redis containers
 - **npm** or **yarn**: Package manager
 - **Alpha Vantage API Key**: Free at [alphavantage.co](https://www.alphavantage.co/support/#api-key)
 
@@ -96,7 +99,16 @@ git clone <repository-url>
 cd stock-sim-trading
 ```
 
-### 2. Backend Setup
+### 2. Start Docker Services
+
+```bash
+# Start PostgreSQL and Redis containers
+docker-compose up -d
+```
+
+Wait 10-15 seconds for services to initialize.
+
+### 3. Backend Setup
 
 ```bash
 cd backend
@@ -116,6 +128,7 @@ JWT_REFRESH_EXPIRES_IN="30d"
 
 # API Keys
 ALPHA_VANTAGE_API_KEY="your-alpha-vantage-api-key"
+FINNHUB_API_KEY="your-finnhub-api-key"
 
 # Redis
 REDIS_URL="redis://localhost:6379"
@@ -130,7 +143,7 @@ RATE_LIMIT_WINDOW_MS="900000"
 RATE_LIMIT_MAX_REQUESTS="100"
 
 # Cache Configuration
-MARKET_DATA_CACHE_TTL="300"
+MARKET_DATA_CACHE_TTL="1800"
 ```
 
 Initialize the database:
@@ -138,6 +151,7 @@ Initialize the database:
 npx prisma generate
 npx prisma db push
 npm run seed
+npm run seed:leaderboard
 ```
 
 Start the backend server:
@@ -145,7 +159,7 @@ Start the backend server:
 npm run dev
 ```
 
-### 3. Frontend Setup
+### 4. Frontend Setup
 
 ```bash
 cd frontend
@@ -153,17 +167,18 @@ npm install
 npm run dev
 ```
 
-### 4. Access the Application
+### 5. Access the Application
 
 - **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:3001
+- **Backend API**: http://localhost:3001/api
+- **Prisma Studio**: http://localhost:5555 (run `npx prisma studio`)
 - **Test Account**:
   - Email: demo@example.com
   - Password: password123
 
 ## Database Schema
 
-The application uses PostgreSQL with 10 main tables:
+The application uses PostgreSQL with 11 main tables:
 
 | Table | Description |
 |-------|-------------|
@@ -171,6 +186,7 @@ The application uses PostgreSQL with 10 main tables:
 | `portfolios` | User portfolios with cash balances |
 | `holdings` | Current stock positions |
 | `trades` | Complete trade history (buy/sell orders) |
+| `watchlists` | User's favorite assets for monitoring |
 | `market_data_cache` | Cached API responses for market data |
 | `leaderboards` | User rankings by time period |
 | `achievements` | Achievement definitions and requirements |
@@ -178,7 +194,7 @@ The application uses PostgreSQL with 10 main tables:
 | `challenges` | Active trading challenges |
 | `user_challenges` | User participation in challenges |
 
-See [docs/DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md) for detailed schema information.
+See [docs/DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md) and [docs/DATABASE_ERD.md](docs/DATABASE_ERD.md) for detailed schema information and visual diagrams.
 
 ## API Endpoints
 
@@ -217,6 +233,14 @@ See [docs/DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md) for detailed schema infor
 - `GET /api/achievements` - List all available achievements
 - `GET /api/achievements/user/:userId` - Get user's achievements
 
+### Watchlist
+- `GET /api/watchlist` - Get user's watchlist
+- `POST /api/watchlist` - Add asset to watchlist
+- `DELETE /api/watchlist/:id` - Remove from watchlist
+- `DELETE /api/watchlist/symbol/:symbol` - Remove by symbol
+- `GET /api/watchlist/check/:symbol` - Check if symbol is in watchlist
+- `POST /api/watchlist/check-batch` - Batch check multiple symbols
+
 ### Challenges
 - `GET /api/challenges` - List active challenges
 - `POST /api/challenges/:id/join` - Join a challenge
@@ -236,17 +260,22 @@ Users start with $100,000 in virtual cash. All trades are executed at real marke
 
 ### Market Data Flow
 1. **Request**: User requests stock price
-2. **Redis Cache Check**: Check 5-minute cache (300s TTL)
+2. **Redis Cache Check**: Check 30-minute cache (1800s TTL)
 3. **Database Cache Check**: Check 30-minute database cache
-4. **Alpha Vantage API**: Primary data source
-5. **Yahoo Finance Fallback**: If Alpha Vantage fails or rate-limited
+4. **Alpha Vantage API**: Primary data source (with request queue)
+5. **Finnhub Fallback**: If Alpha Vantage fails or rate-limited
 6. **Cache Update**: Store in both Redis and database
+
+The system implements intelligent rate limiting with request queues:
+- Alpha Vantage: 12-second delay (5 req/min limit)
+- Finnhub: 1-second delay (60 req/min limit)
+- Batch API support for multi-symbol requests (90-97% faster)
 
 ### Background Jobs
 Scheduled tasks running via node-cron:
 - **Daily at Midnight**: Full leaderboard recalculation
-- **Hourly (9 AM - 4 PM EST, Mon-Fri)**: Market hours leaderboard updates
-- **Every 15 Minutes (Market Hours)**: Placeholder for market data refresh
+- **Every 2 Hours (9 AM - 4 PM EST, Mon-Fri)**: Market hours leaderboard updates
+- **Daily at 2 AM**: Cleanup stale market data cache (> 24 hours old)
 
 ### Authentication Flow
 1. User registers with email/username/password
@@ -282,6 +311,7 @@ npm run build        # Compile TypeScript to JavaScript
 npm start            # Run production build
 npm run migrate      # Run Prisma migrations
 npm run seed         # Seed database with sample data
+npm run seed:leaderboard  # Populate leaderboard with synthetic data
 npm run studio       # Open Prisma Studio (database GUI)
 npm test             # Run Jest tests with coverage
 npm run lint         # Run ESLint
@@ -305,14 +335,15 @@ npm test             # Run Vitest tests
 | `JWT_EXPIRES_IN` | Access token expiry | 7d |
 | `JWT_REFRESH_SECRET` | Refresh token secret | Required |
 | `JWT_REFRESH_EXPIRES_IN` | Refresh token expiry | 30d |
-| `ALPHA_VANTAGE_API_KEY` | Alpha Vantage API key | Optional |
+| `ALPHA_VANTAGE_API_KEY` | Alpha Vantage API key | Required |
+| `FINNHUB_API_KEY` | Finnhub API key | Optional |
 | `REDIS_URL` | Redis connection string | redis://localhost:6379 |
 | `NODE_ENV` | Environment mode | development |
 | `PORT` | Backend server port | 3001 |
 | `FRONTEND_URL` | Frontend URL for CORS | http://localhost:5173 |
 | `RATE_LIMIT_WINDOW_MS` | Rate limit window | 900000 (15min) |
 | `RATE_LIMIT_MAX_REQUESTS` | Max requests per window | 100 |
-| `MARKET_DATA_CACHE_TTL` | Redis cache TTL in seconds | 300 (5min) |
+| `MARKET_DATA_CACHE_TTL` | Redis cache TTL in seconds | 1800 (30min) |
 
 ## Security Features
 
@@ -339,6 +370,15 @@ npm run seed
 
 ### Redis Connection Issues
 ```bash
+# Check if Redis container is running
+docker ps | grep redis
+
+# Start Redis via Docker
+docker-compose up -d redis
+
+# Or start Docker Engine entirely
+# Ensure Docker Desktop is running
+
 # Test Redis connection
 redis-cli ping
 # Should return: PONG
@@ -355,14 +395,15 @@ lsof -ti:3001 | xargs kill -9
 ```
 
 ### Alpha Vantage Rate Limit
-The application automatically falls back to Yahoo Finance when Alpha Vantage rate limits are hit (5 requests/minute on the free tier). Consider upgrading to a paid plan for higher limits.
+The application automatically falls back to Finnhub when Alpha Vantage rate limits are hit (5 requests/minute on the free tier). The system uses request queuing to prevent rate limit errors. Consider upgrading to a paid API plan for higher limits.
 
 ## Performance Considerations
 
-- **Redis Caching**: Reduces API calls by 90%+ for frequently accessed stocks
+- **Redis Caching**: 30-minute TTL reduces API calls by 83%+ for frequently accessed stocks
+- **Batch API Requests**: 90-97% faster for portfolio views with multi-symbol fetching
+- **Request Queuing**: Intelligent rate limiting prevents API throttling
 - **Database Indexing**: Primary keys and foreign keys indexed via Prisma
 - **Connection Pooling**: Prisma manages PostgreSQL connection pool
-- **API Throttling**: Request queuing prevents rate limit errors (future enhancement)
 - **Lazy Loading**: Frontend components load on demand
 
 ## Testing
@@ -390,10 +431,11 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
-- **Alpha Vantage** - Real-time and historical stock market data
-- **Finnhub** - Fallback market data source
-- **Prisma** - Next-generation ORM
+- **Alpha Vantage** - Primary real-time and historical stock market data
+- **Finnhub** - Secondary fallback market data source
+- **Prisma** - Next-generation ORM for database management
 - **React Team** - Frontend framework
+- **Docker** - Containerization for PostgreSQL and Redis
 - **All Contributors** - Open-source community
 
 ## Support
@@ -414,9 +456,10 @@ Future enhancements under consideration:
 - Portfolio analytics and insights
 - News feed integration
 - Educational content and tutorials
+- Advanced order types (limit, stop-loss, after-hours)
 
 ---
 
-**Current Version**: 1.0.0
-**Last Updated**: October 2025
+**Current Version**: 1.1.0
+**Last Updated**: December 2025
 **Status**: Active Development

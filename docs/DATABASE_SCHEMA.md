@@ -23,13 +23,14 @@ Complete database schema reference for the Stock Market Simulation & Trading Gam
 
 ## Overview
 
-The database consists of **10 main tables** organized into four functional areas:
+The database consists of **11 main tables** organized into four functional areas:
 
 ### Core User & Portfolio Management
 - `users` - User accounts and authentication
 - `portfolios` - User portfolios with cash balances
 - `holdings` - Current asset positions
 - `trades` - Complete transaction history
+- `watchlists` - User's favorite assets for monitoring
 
 ### Market Data
 - `market_data_cache` - Cached stock/crypto prices
@@ -51,18 +52,18 @@ The database consists of **10 main tables** organized into four functional areas
 └──────┬──────┘
        │
        │ 1:N
-       ├──────────────┬──────────────┬──────────────┬──────────────┐
-       │              │              │              │              │
-       ▼              ▼              ▼              ▼              ▼
-┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
-│ portfolios  │ │leaderboards │ │   user_     │ │   user_     │ │   user_     │
-│             │ │             │ │achievements │ │ challenges  │ │             │
-└──────┬──────┘ └─────────────┘ └──────┬──────┘ └──────┬──────┘ └─────────────┘
-       │                               │              │
-       │ 1:N                           │ N:1          │ N:1
-       ├─────────┬─────────┬───────────┤              │
-       │         │         │           │              │
-       ▼         ▼         ▼           ▼              ▼
+       ├──────────────┬──────────────┬──────────────┬──────────────┬──────────────┐
+       │              │              │              │              │              │
+       ▼              ▼              ▼              ▼              ▼              ▼
+┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+│ portfolios  │ │ watchlists  │ │leaderboards │ │   user_     │ │   user_     │ │             │
+│             │ │             │ │             │ │achievements │ │ challenges  │ │             │
+└──────┬──────┘ └─────────────┘ └─────────────┘ └──────┬──────┘ └──────┬──────┘ └─────────────┘
+       │                                                │              │
+       │ 1:N                                            │ N:1          │ N:1
+       ├─────────┬─────────┬────────────────────────────┤              │
+       │         │         │                            │              │
+       ▼         ▼         ▼                            ▼              ▼
 ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐ ┌─────────────┐
 │holdings │ │ trades  │ │leaderb..│ │achievements │ │ challenges  │
 └─────────┘ └─────────┘ └─────────┘ └─────────────┘ └─────────────┘
@@ -240,7 +241,45 @@ executed_at: 2025-10-21 14:30:00
 
 ---
 
-### 5. market_data_cache
+### 5. watchlists
+
+User's favorite assets for monitoring.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | UUID | PRIMARY KEY | Unique watchlist entry identifier |
+| `user_id` | UUID | FOREIGN KEY, NOT NULL | References users(id) |
+| `symbol` | VARCHAR(20) | NOT NULL | Stock/crypto ticker symbol |
+| `asset_type` | ENUM | NOT NULL | STOCK or CRYPTO |
+| `added_at` | TIMESTAMP | DEFAULT NOW() | When symbol was added |
+| `notes` | TEXT | NULLABLE | Optional user notes |
+
+**Indexes**:
+- Primary key on `id`
+- Index on `user_id`
+- Index on `symbol`
+- Unique constraint on `(user_id, symbol)` - one entry per symbol per user
+
+**Relationships**:
+- Many-to-One with `users`
+
+**Constraints**:
+- `ON DELETE CASCADE` on user_id
+- Unique constraint on (user_id, symbol)
+
+**Sample Row**:
+```sql
+id: ff0e8400-e29b-41d4-a716-446655440010
+user_id: 550e8400-e29b-41d4-a716-446655440000
+symbol: AAPL
+asset_type: STOCK
+added_at: 2025-12-16 10:00:00
+notes: Tech giant - monitoring for dip
+```
+
+---
+
+### 6. market_data_cache
 
 Cached stock and cryptocurrency prices.
 
@@ -278,7 +317,7 @@ last_updated: 2025-10-21 15:30:00
 
 ---
 
-### 6. leaderboards
+### 7. leaderboards
 
 User rankings by time period.
 
@@ -320,7 +359,7 @@ created_at: 2025-10-21 16:00:00
 
 ---
 
-### 7. achievements
+### 8. achievements
 
 Achievement definitions for gamification.
 
@@ -354,7 +393,7 @@ created_at: 2025-10-01 00:00:00
 
 ---
 
-### 8. user_achievements
+### 9. user_achievements
 
 User's earned achievements.
 
@@ -388,7 +427,7 @@ earned_at: 2025-10-21 14:30:00
 
 ---
 
-### 9. challenges
+### 10. challenges
 
 Time-bound trading challenges.
 
@@ -423,7 +462,7 @@ is_active: true
 
 ---
 
-### 10. user_challenges
+### 11. user_challenges
 
 User participation in challenges.
 
@@ -590,6 +629,10 @@ All tables have a PRIMARY KEY on `id` (UUID).
 - One user can participate in multiple challenges
 - Cascade delete: Delete user → delete all their participations
 
+**User → Watchlists**
+- One user can watch multiple assets
+- Cascade delete: Delete user → delete all their watchlist entries
+
 **Portfolio → Holdings**
 - One portfolio can have multiple holdings
 - Cascade delete: Delete portfolio → delete all its holdings
@@ -656,8 +699,9 @@ All foreign key relationships use `ON DELETE CASCADE`:
 3. **market_data_cache.symbol** - One cache entry per symbol
 4. **achievements.name** - Unique achievement names
 5. **holdings(portfolio_id, symbol)** - One holding per symbol per portfolio
-6. **user_achievements(user_id, achievement_id)** - Can't earn same achievement twice
-7. **user_challenges(user_id, challenge_id)** - Can't join same challenge twice
+6. **watchlists(user_id, symbol)** - One watchlist entry per symbol per user
+7. **user_achievements(user_id, achievement_id)** - Can't earn same achievement twice
+8. **user_challenges(user_id, challenge_id)** - Can't join same challenge twice
 
 ### Default Values
 
@@ -775,6 +819,6 @@ Consider archiving old trades/leaderboards after 1+ year for performance.
 
 ---
 
-**Schema Version**: 1.0.0
-**Last Updated**: October 2025
+**Schema Version**: 1.1.0
+**Last Updated**: December 2025
 **Prisma Version**: 5.22.0

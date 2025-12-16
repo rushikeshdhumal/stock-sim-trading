@@ -1,8 +1,8 @@
 # Startup Instructions
 
 ## Prerequisites
-- Node.js (v16 or higher)
-- Docker Desktop
+- Node.js (v18 or higher)
+- Docker Desktop (running)
 - Git
 
 ## Quick Start
@@ -31,16 +31,23 @@ cd backend
 cp .env.example .env
 ```
 Edit `backend/.env` and add your API keys:
-- `ALPHA_VANTAGE_API_KEY` (optional)
-- `FINNHUB_API_KEY` (optional)
+- `ALPHA_VANTAGE_API_KEY` (required) - Get free at https://www.alphavantage.co/support/#api-key
+- `FINNHUB_API_KEY` (optional but recommended) - Get free at https://finnhub.io/register
 - Other keys use defaults from .env.example
 
 ### 4. Setup Database Schema
 ```bash
 cd backend
 npx prisma db push
+npm run seed
+npm run seed:leaderboard
 ```
 **Note:** If `npx prisma migrate dev` fails with shadow database errors, use `npx prisma db push` instead. This syncs the schema directly without requiring a shadow database.
+
+The seed commands will:
+- Create demo users and portfolios
+- Create sample achievements
+- Populate leaderboard with synthetic data
 
 ### 5. Start Development Servers
 ```bash
@@ -58,6 +65,11 @@ npm run dev                 # Port 5173
 ### 6. Access the Application
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:3001/api
+- Prisma Studio: http://localhost:5555 (run `npx prisma studio`)
+
+**Demo Account:**
+- Email: demo@example.com
+- Password: password123
 
 ## Stopping the Application
 
@@ -81,6 +93,9 @@ docker-compose down
 
 **API rate limits:**
 - Add API keys in `backend/.env` for real market data
+- Alpha Vantage: 5 requests/minute (free tier)
+- Finnhub: 60 requests/minute (free tier)
+- System automatically queues requests to respect rate limits
 
 **Prisma migration errors (P3014/P1003):**
 - If `npx prisma migrate dev` fails with shadow database permission errors:
@@ -92,10 +107,17 @@ docker-compose down
 **Port already in use (EADDRINUSE):**
 - If the backend fails to start with "address already in use :::3001":
   ```bash
-  # Find the process using port 3001
+  # Windows
   netstat -ano | findstr :3001
-
-  # Kill the process (replace <PID> with the actual process ID from above)
   taskkill /F /PID <PID>
+
+  # macOS/Linux
+  lsof -ti:3001 | xargs kill -9
   ```
   - Then restart the dev server with `npm run dev`
+
+**Redis connection refused:**
+- Ensure Docker Desktop is running
+- Run `docker-compose up -d` to start Redis
+- Check Redis status: `docker ps | grep redis`
+- Test connection: `redis-cli ping` (should return PONG)

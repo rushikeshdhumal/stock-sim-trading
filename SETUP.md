@@ -25,8 +25,9 @@ This guide provides detailed step-by-step instructions for setting up the Stock 
 
 ### Software Requirements
 - Node.js 18.x or higher
-- PostgreSQL 14.x or higher
-- Redis 6.x or higher
+- PostgreSQL 14.x or higher (Docker recommended)
+- Redis 6.x or higher (Docker recommended)
+- Docker Desktop (for running PostgreSQL and Redis)
 - Git
 
 ---
@@ -95,16 +96,52 @@ sudo systemctl enable postgresql
 psql --version
 ```
 
-### 3. Redis Installation
+### 3. Docker Desktop Installation (Recommended)
+
+#### Windows
+1. Download Docker Desktop from [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/)
+2. Run the installer
+3. Start Docker Desktop
+4. Verify installation:
+```bash
+docker --version
+docker-compose --version
+```
+
+#### macOS
+```bash
+# Using Homebrew
+brew install --cask docker
+
+# Or download from docker.com
+# Start Docker Desktop from Applications
+docker --version
+```
+
+#### Linux (Ubuntu/Debian)
+```bash
+# Install Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+
+# Install Docker Compose
+sudo apt-get update
+sudo apt-get install docker-compose-plugin
+
+# Verify
+docker --version
+docker compose version
+```
+
+### 4. Redis Installation (Optional - Docker is Recommended)
+
+**Recommended**: Use Docker Compose (see Database Setup section)
+
+If you prefer manual installation:
 
 #### Windows
 1. Download Redis for Windows from [github.com/microsoftarchive/redis/releases](https://github.com/microsoftarchive/redis/releases)
 2. Extract and run `redis-server.exe`
-
-Or use Docker:
-```bash
-docker run -d -p 6379:6379 --name redis redis:latest
-```
 
 #### macOS
 ```bash
@@ -126,7 +163,7 @@ redis-cli ping
 # Should return: PONG
 ```
 
-### 4. Git Installation
+### 5. Git Installation
 
 #### Windows
 Download from [git-scm.com](https://git-scm.com/download/win) and run the installer.
@@ -150,6 +187,59 @@ git --version
 ---
 
 ## Database Setup
+
+### Option A: Using Docker Compose (Recommended)
+
+This is the easiest and recommended method. Docker Compose will set up both PostgreSQL and Redis for you.
+
+```bash
+# From project root directory
+docker-compose up -d
+```
+
+This command:
+- Downloads PostgreSQL and Redis images (if not already present)
+- Starts both services in the background
+- Creates persistent volumes for data storage
+- Configures networking between containers
+
+**Verify services are running:**
+```bash
+docker ps
+
+# Should show containers named: stock-sim-trading-postgres-1 and stock-sim-trading-redis-1
+```
+
+**Test database connection:**
+```bash
+# Windows PowerShell
+$env:PGPASSWORD="password"
+& "C:\Program Files\PostgreSQL\17\bin\psql.exe" -h localhost -U postgres -d stocksim -c "SELECT version();"
+
+# macOS/Linux
+PGPASSWORD=password psql -h localhost -U postgres -d stocksim -c "SELECT version();"
+```
+
+**Test Redis connection:**
+```bash
+redis-cli ping
+# Should return: PONG
+```
+
+**Stop services:**
+```bash
+docker-compose down
+```
+
+**View logs:**
+```bash
+docker-compose logs postgres
+docker-compose logs redis
+```
+
+### Option B: Manual PostgreSQL Setup
+
+If you prefer to install PostgreSQL manually instead of using Docker:
 
 ### 1. Create PostgreSQL Database
 
@@ -263,6 +353,9 @@ JWT_REFRESH_EXPIRES_IN="30d"
 ALPHA_VANTAGE_API_KEY="your-alpha-vantage-api-key"
 # Get free key at: https://www.alphavantage.co/support/#api-key
 
+FINNHUB_API_KEY="your-finnhub-api-key"
+# Get free key at: https://finnhub.io/register
+
 # Redis Configuration
 REDIS_URL="redis://localhost:6379"
 
@@ -276,13 +369,14 @@ RATE_LIMIT_WINDOW_MS="900000"
 RATE_LIMIT_MAX_REQUESTS="100"
 
 # Cache Configuration
-MARKET_DATA_CACHE_TTL="300"
+MARKET_DATA_CACHE_TTL="1800"
 ```
 
 **Important Notes:**
-- Replace `password` with your actual PostgreSQL password
+- Replace `password` with your actual PostgreSQL password (if using Docker, default is `password`)
 - Generate strong random secrets for JWT_SECRET and JWT_REFRESH_SECRET
 - Get a free Alpha Vantage API key from [alphavantage.co](https://www.alphavantage.co/support/#api-key)
+- Get a free Finnhub API key from [finnhub.io](https://finnhub.io/register)
 - FRONTEND_URL should match your Vite dev server (default: port 5173)
 
 ### 4. Generate Prisma Client
@@ -317,6 +411,7 @@ Populate the database with sample data:
 
 ```bash
 npm run seed
+npm run seed:leaderboard
 ```
 
 This creates:
@@ -325,6 +420,7 @@ This creates:
 - Sample achievements
 - Sample challenges
 - Test trades
+- Leaderboard rankings for all time periods
 
 **Demo Account Credentials:**
 - Email: `demo@example.com`
@@ -538,20 +634,40 @@ psql -U postgres -d stocksim -c "SELECT 1;"
 **Error**: `Error: connect ECONNREFUSED 127.0.0.1:6379`
 
 **Solutions**:
-1. Start Redis:
+1. **If using Docker** (recommended):
+```bash
+# Check if Docker Desktop is running
+docker ps
+
+# Check if Redis container is running
+docker ps | grep redis
+
+# Start Docker services
+docker-compose up -d redis
+
+# Or restart all services
+docker-compose restart
+```
+
+2. **If using manual Redis installation**:
    - Windows: Run `redis-server.exe`
    - macOS: `brew services start redis`
    - Linux: `sudo systemctl start redis-server`
 
-2. Test connection:
+3. Test connection:
 ```bash
 redis-cli ping
+# Should return: PONG
 ```
 
-3. If using Docker:
+4. Check Redis logs if issues persist:
 ```bash
-docker ps  # Check if redis container is running
-docker start redis  # Start if stopped
+# Docker
+docker-compose logs redis
+
+# Manual installation
+# Windows: Check redis-server.exe output
+# Linux: sudo journalctl -u redis-server
 ```
 
 ### Issue 4: Prisma Client Not Generated
