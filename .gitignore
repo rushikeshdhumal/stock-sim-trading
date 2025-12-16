@@ -40,7 +40,8 @@ logs/
 
 # Documentation
 docs/TEAM_PROJECT_PLAN.md
-.github/copilot-instructions.md
+.github/
+index.html
 
 # Docker
 docker-compose.override.yml
