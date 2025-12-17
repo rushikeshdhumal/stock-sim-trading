@@ -1,27 +1,64 @@
+/**
+ * Environment Configuration
+ *
+ * Validates and exports environment variables using Zod schema validation.
+ * Ensures all required environment variables are present and properly formatted.
+ * Application will exit with error if validation fails.
+ */
+
 import dotenv from 'dotenv';
 import { z } from 'zod';
 
+// Load environment variables from .env file
 dotenv.config();
 
-// Environment variables schema
+/**
+ * Environment Variables Schema
+ *
+ * Defines the structure and validation rules for all environment variables.
+ * Required variables must be present in .env file.
+ * Optional variables have default values.
+ */
 const envSchema = z.object({
+  // Server Configuration
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.string().default('3001'),
-  DATABASE_URL: z.string(),
+
+  // Database Configuration
+  DATABASE_URL: z.string(), // Required: PostgreSQL connection string
+
+  // Redis Configuration
   REDIS_URL: z.string().default('redis://localhost:6379'),
-  JWT_SECRET: z.string(),
-  JWT_EXPIRES_IN: z.string().default('7d'),
-  JWT_REFRESH_SECRET: z.string(),
-  JWT_REFRESH_EXPIRES_IN: z.string().default('30d'),
-  ALPHA_VANTAGE_API_KEY: z.string().optional(),
-  FINNHUB_API_KEY: z.string().optional(),
+
+  // JWT Authentication
+  JWT_SECRET: z.string(), // Required: Secret key for access tokens
+  JWT_EXPIRES_IN: z.string().default('7d'), // Access token validity period
+  JWT_REFRESH_SECRET: z.string(), // Required: Secret key for refresh tokens
+  JWT_REFRESH_EXPIRES_IN: z.string().default('30d'), // Refresh token validity period
+
+  // External API Keys
+  ALPHA_VANTAGE_API_KEY: z.string().optional(), // Primary market data source
+  FINNHUB_API_KEY: z.string().optional(), // Fallback market data source
+
+  // CORS Configuration
   FRONTEND_URL: z.string().default('http://localhost:3000'),
-  RATE_LIMIT_WINDOW_MS: z.string().default('900000'),
-  RATE_LIMIT_MAX_REQUESTS: z.string().default('100'),
-  MARKET_DATA_CACHE_TTL: z.string().default('300'),
+
+  // Rate Limiting
+  RATE_LIMIT_WINDOW_MS: z.string().default('900000'), // 15 minutes in milliseconds
+  RATE_LIMIT_MAX_REQUESTS: z.string().default('100'), // Max requests per window
+
+  // Caching
+  MARKET_DATA_CACHE_TTL: z.string().default('300'), // Cache duration in seconds (5 minutes default)
 });
 
-// Validate and export environment variables
+/**
+ * Parse and Validate Environment Variables
+ *
+ * Attempts to parse environment variables against the schema.
+ * If validation fails, prints detailed error messages and exits the application.
+ *
+ * @returns {z.infer<typeof envSchema>} Validated environment variables
+ */
 const parseEnv = () => {
   try {
     return envSchema.parse(process.env);
@@ -36,6 +73,7 @@ const parseEnv = () => {
   }
 };
 
+// Validated environment variables - safe to use throughout the application
 export const env = parseEnv();
 
 export default env;

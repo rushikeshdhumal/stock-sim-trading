@@ -1,3 +1,30 @@
+/**
+ * Authentication Service
+ *
+ * Handles user authentication, registration, and profile management.
+ *
+ * KEY FEATURES:
+ * - User registration with automatic portfolio creation
+ * - Secure password hashing using bcrypt (12 rounds)
+ * - JWT-based authentication (access + refresh tokens)
+ * - Email and username uniqueness validation
+ * - Starting balance: $100,000 virtual cash per user
+ *
+ * SECURITY:
+ * - Passwords hashed with bcrypt (12 salt rounds)
+ * - Access tokens: 7-day expiry (configurable)
+ * - Refresh tokens: 30-day expiry (configurable)
+ * - Tokens signed with separate secrets
+ *
+ * USER REGISTRATION FLOW:
+ * 1. Validate email/username uniqueness
+ * 2. Hash password with bcrypt
+ * 3. Create user record
+ * 4. Create default portfolio with $100,000 cash
+ * 5. Generate JWT tokens
+ * 6. Return user data with tokens
+ */
+
 import bcrypt from 'bcrypt';
 import { User } from '@prisma/client';
 import getPrismaClient from '../config/database';
@@ -10,7 +37,16 @@ const prisma = getPrismaClient();
 
 export class AuthService {
   /**
-   * Register a new user
+   * Register New User
+   *
+   * Creates a new user account with hashed password and default portfolio.
+   * Automatically assigns $100,000 starting balance.
+   *
+   * @param {string} username - Unique username (3-20 characters)
+   * @param {string} email - Unique email address
+   * @param {string} password - Plain text password (will be hashed)
+   * @returns {Promise<AuthResponse>} User data with JWT tokens
+   * @throws {AppError} 409 if email or username already exists
    */
   async register(
     username: string,

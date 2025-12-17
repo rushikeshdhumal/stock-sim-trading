@@ -1,3 +1,27 @@
+/**
+ * Navigation Component
+ *
+ * Main navigation header with responsive design for desktop and mobile.
+ *
+ * FEATURES:
+ * - Sticky header navigation
+ * - Active route highlighting
+ * - User authentication display
+ * - Logout functionality
+ * - Responsive mobile menu
+ * - Dark mode support
+ *
+ * NAVIGATION LINKS:
+ * - Dashboard: Portfolio overview and performance
+ * - Market: Browse and search stocks
+ * - Watchlist: Saved stocks for tracking
+ * - Leaderboard: Global rankings
+ * - Achievements: Gamification milestones
+ *
+ * RESPONSIVE BEHAVIOR:
+ * - Desktop: Horizontal navigation bar
+ * - Mobile: Collapsible scrollable menu
+ */
 import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../context/authStore';
 
@@ -5,8 +29,10 @@ export default function Navigation() {
   const { user, logout } = useAuthStore();
   const location = useLocation();
 
+  // Check if current path matches the given path for active state styling
   const isActive = (path: string) => location.pathname === path;
 
+  // Generate CSS classes for navigation links based on active state
   const navLinkClass = (path: string) =>
     `px-4 py-2 rounded-lg font-medium transition-colors ${
       isActive(path)

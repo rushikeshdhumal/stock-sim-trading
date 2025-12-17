@@ -1,3 +1,44 @@
+/**
+ * Trading Modal Component
+ *
+ * Full-featured modal for executing stock trades (buy/sell).
+ *
+ * FEATURES:
+ * - Buy/Sell toggle
+ * - Real-time stock symbol search with autocomplete
+ * - Live price quotes with 24h change
+ * - Quantity input with validation
+ * - Order summary with total value calculation
+ * - Cash balance and holdings validation
+ * - Watchlist integration (add/remove stocks)
+ * - Responsive design with dark mode support
+ *
+ * VALIDATION:
+ * - Buy: Validates sufficient cash balance
+ * - Sell: Validates sufficient holdings quantity
+ * - Real-time feedback on available funds/holdings
+ *
+ * WORKFLOW:
+ * 1. User selects BUY or SELL
+ * 2. Searches and selects stock symbol
+ * 3. Quote loads with current price
+ * 4. Enters quantity
+ * 5. Reviews order summary
+ * 6. Confirms trade
+ * 7. Portfolio refreshes on success
+ *
+ * PROPS:
+ * - isOpen: Modal visibility state
+ * - onClose: Callback when modal closes
+ * - portfolioId: Current portfolio ID for trade
+ * - initialSymbol: Pre-populate symbol (optional)
+ * - initialType: Pre-select BUY or SELL (optional)
+ * - onTradeComplete: Callback after successful trade
+ * - cashBalance: Available cash for validation
+ * - holdings: Current portfolio holdings for sell validation
+ * - onToggleWatchlist: Callback for watchlist actions (optional)
+ * - watchlistStatus: Map of symbols to watchlist status (optional)
+ */
 import { useState, useEffect } from 'react';
 import type { MarketQuote } from '../types/index.js';
 import marketService from '../services/marketService';
@@ -29,14 +70,16 @@ export default function TradingModal({
   onToggleWatchlist,
   watchlistStatus,
 }: TradingModalProps) {
-  const [tradeType, setTradeType] = useState<'BUY' | 'SELL'>(initialType);
-  const [symbol, setSymbol] = useState(initialSymbol);
-  const [quantity, setQuantity] = useState('');
-  const [quote, setQuote] = useState<MarketQuote | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [searching, setSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  // Component state
+  const [tradeType, setTradeType] = useState<'BUY' | 'SELL'>(initialType); // Buy or sell mode
+  const [symbol, setSymbol] = useState(initialSymbol); // Stock symbol being traded
+  const [quantity, setQuantity] = useState(''); // Number of shares
+  const [quote, setQuote] = useState<MarketQuote | null>(null); // Current price quote
+  const [loading, setLoading] = useState(false); // Trade execution loading state
+  const [searching, setSearching] = useState(false); // Symbol search loading state
+  const [searchResults, setSearchResults] = useState<any[]>([]); // Search autocomplete results
 
+  // Load initial symbol quote when modal opens
   useEffect(() => {
     if (isOpen && initialSymbol) {
       setSymbol(initialSymbol);
@@ -44,6 +87,12 @@ export default function TradingModal({
     }
   }, [initialSymbol, isOpen]);
 
+  /**
+   * Load Quote for Symbol
+   *
+   * Fetches real-time price quote for a stock symbol.
+   * Clears search results after successful quote load.
+   */
   const loadQuote = async (sym: string) => {
     if (!sym) return;
 
@@ -59,6 +108,12 @@ export default function TradingModal({
     }
   };
 
+  /**
+   * Handle Symbol Search
+   *
+   * Searches for stock symbols as user types.
+   * Provides autocomplete suggestions.
+   */
   const handleSearch = async (query: string) => {
     setSymbol(query);
     if (query.length < 1) {
@@ -77,11 +132,33 @@ export default function TradingModal({
     }
   };
 
+  /**
+   * Handle Symbol Selection
+   *
+   * Called when user selects a symbol from search results.
+   * Loads the quote for the selected symbol.
+   */
   const handleSelectSymbol = (selectedSymbol: string) => {
     setSymbol(selectedSymbol);
     loadQuote(selectedSymbol);
   };
 
+  /**
+   * Handle Trade Execution
+   *
+   * Validates and executes the buy or sell order.
+   *
+   * VALIDATION:
+   * - Ensures all fields are filled
+   * - Checks quantity is valid number
+   * - Buy: Verifies sufficient cash balance
+   * - Sell: Verifies sufficient holdings
+   *
+   * ON SUCCESS:
+   * - Shows success toast
+   * - Calls onTradeComplete to refresh portfolio
+   * - Closes modal and resets form
+   */
   const handleTrade = async () => {
     if (!symbol || !quantity || !quote) {
       toast.error('Please fill in all fields');
@@ -139,6 +216,12 @@ export default function TradingModal({
     }
   };
 
+  /**
+   * Reset Form State
+   *
+   * Clears all form fields and search results.
+   * Called after successful trade or when modal closes.
+   */
   const resetForm = () => {
     setSymbol('');
     setQuantity('');
@@ -146,13 +229,20 @@ export default function TradingModal({
     setSearchResults([]);
   };
 
+  /**
+   * Handle Modal Close
+   *
+   * Resets form and calls parent onClose callback.
+   */
   const handleClose = () => {
     resetForm();
     onClose();
   };
 
+  // Calculate total order value (price × quantity)
   const totalValue = quote && quantity ? quote.currentPrice * parseFloat(quantity) : 0;
 
+  // Don't render if modal is closed
   if (!isOpen) return null;
 
   return (

@@ -1,3 +1,30 @@
+/**
+ * Trade Service
+ *
+ * Handles stock trading operations including trade execution, validation, and history.
+ *
+ * KEY RESPONSIBILITIES:
+ * - Execute buy/sell trades with market price validation
+ * - Update portfolio cash balance and holdings
+ * - Maintain complete trade history for auditing
+ * - Validate trades (sufficient funds, sufficient holdings)
+ * - Trigger achievement checks after trades
+ *
+ * TRADE EXECUTION FLOW:
+ * 1. Verify portfolio ownership
+ * 2. Fetch current market price
+ * 3. Validate trade (funds/holdings check)
+ * 4. Execute in database transaction:
+ *    - Create trade record
+ *    - Update cash balance
+ *    - Update holdings (create/update/delete)
+ * 5. Recalculate portfolio value
+ * 6. Check for new achievements
+ *
+ * IMPORTANT: All trade operations use database transactions to ensure
+ * atomicity and prevent data inconsistencies.
+ */
+
 import { Trade } from '@prisma/client';
 import getPrismaClient from '../config/database';
 import { AppError } from '../middleware/errorHandler';
@@ -11,7 +38,19 @@ const prisma = getPrismaClient();
 
 export class TradeService {
   /**
-   * Execute a trade (BUY or SELL)
+   * Execute a Trade (BUY or SELL)
+   *
+   * Executes a complete trading operation with validation and portfolio updates.
+   * Uses database transaction to ensure atomicity.
+   *
+   * @param {string} portfolioId - Portfolio ID to trade in
+   * @param {string} userId - User ID (for ownership verification)
+   * @param {string} symbol - Stock symbol (e.g., "AAPL")
+   * @param {'STOCK' | 'CRYPTO'} assetType - Type of asset
+   * @param {'BUY' | 'SELL'} tradeType - Trade direction
+   * @param {number} quantity - Number of shares to trade
+   * @returns {Promise<TradeResult>} Trade result with updated portfolio info
+   * @throws {AppError} If portfolio not found, insufficient funds, or insufficient holdings
    */
   async executeTrade(
     portfolioId: string,
